@@ -125,7 +125,13 @@ export function commitLab(wdb, payload, opts = {}) {
      VALUES (?,?,?,?,?,?, 'pending')
      ON CONFLICT(lab_name, report_id) DO UPDATE SET collected_at = excluded.collected_at,
        panel = excluded.panel, raw_payload = excluded.raw_payload, parsed_review = excluded.parsed_review,
-       review_status = CASE WHEN lab_results.review_status = 'rejected' THEN 'pending' ELSE lab_results.review_status END`
+       -- Re-importing a previously REJECTED report re-opens it for review. Clear the
+       -- prior reviewer attribution (it no longer applies to the now-pending row) and
+       -- leave an audit note instead of silently dropping the decision.
+       review_status = CASE WHEN lab_results.review_status = 'rejected' THEN 'pending' ELSE lab_results.review_status END,
+       reviewer_id = CASE WHEN lab_results.review_status = 'rejected' THEN NULL ELSE lab_results.reviewer_id END,
+       reviewed_at = CASE WHEN lab_results.review_status = 'rejected' THEN NULL ELSE lab_results.reviewed_at END,
+       review_note = CASE WHEN lab_results.review_status = 'rejected' THEN 'Heropend door re-import (vorige beoordeling: rejected)' ELSE lab_results.review_note END`
   ).run(collected_at, lab_name, panel, report_id, JSON.stringify(normalPayload), JSON.stringify(parsed));
   const labResultId = wdb.prepare('SELECT id FROM lab_results WHERE lab_name = ? AND report_id IS ?').get(lab_name, report_id)?.id
     ?? Number(labRow.lastInsertRowid);
@@ -192,12 +198,20 @@ export function reviewLabResult(db, id, patch = {}) {
   const note = patch.review_note ?? patch.note ?? null;
   const existing = db.prepare('SELECT id FROM lab_results WHERE id = ?').get(id);
   if (!existing) return null;
-  db.prepare(
+  // Lost-update guard: a decision (approved/rejected) may only be applied to a
+  // still-pending row, so two concurrent reviewers cannot silently overwrite each
+  // other's verdict. Re-opening to 'pending' is always allowed.
+  const guard = status === 'pending' ? '' : " AND review_status = 'pending'";
+  const res = db.prepare(
     `UPDATE lab_results
         SET review_status = ?, reviewer_id = ?, reviewed_at = datetime('now'),
             biomarker_id = ?, review_note = ?
-      WHERE id = ?`
+      WHERE id = ?${guard}`
   ).run(status, reviewer, biomarker, note, id);
+  if (res.changes === 0) {
+    const current = db.prepare('SELECT review_status FROM lab_results WHERE id = ?').get(id);
+    throw new BadRequest(`lab result ${id} is al beoordeeld (${current?.review_status}); zet eerst terug naar 'pending' om opnieuw te beoordelen`);
+  }
   return getLabResult(db, id);
 }
 

@@ -63,6 +63,29 @@ export function run() {
     closeDb(db);
   }
 
+  // ── review lifecycle: re-import audit + concurrency guard (#8) ───────────────
+  {
+    const db = buildDb();
+    const c = commitLab(db, PAYLOAD);
+    reviewLabResult(db, c.lab_result_id, { review_status: 'rejected', reviewer_id: 'reviewer-a', review_note: 'looks off' });
+    // Re-import of the same report_id re-opens it, clears attribution, leaves an audit note.
+    commitLab(db, PAYLOAD);
+    const reopened = db.prepare('SELECT review_status, reviewer_id, reviewed_at, review_note FROM lab_results WHERE id = ?').get(c.lab_result_id);
+    t.eq('re-import re-opens rejected report', reopened.review_status, 'pending');
+    t.ok('re-import clears stale reviewer attribution', reopened.reviewer_id === null && reopened.reviewed_at === null, JSON.stringify(reopened));
+    t.ok('re-import leaves audit note', /Heropend door re-import/.test(reopened.review_note || ''), reopened.review_note);
+
+    // Lost-update guard: deciding an already-decided row is blocked; reopen stays allowed.
+    reviewLabResult(db, c.lab_result_id, { review_status: 'approved', reviewer_id: 'reviewer-b', biomarker_id: 'blood.ldl_cholesterol' });
+    let threw = false;
+    try { reviewLabResult(db, c.lab_result_id, { review_status: 'rejected', reviewer_id: 'reviewer-c' }); }
+    catch (e) { threw = /al beoordeeld/.test(e.message); }
+    t.ok('decision on already-reviewed row is blocked (lost-update guard)', threw, 'expected BadRequest');
+    const reopen = reviewLabResult(db, c.lab_result_id, { review_status: 'pending', reviewer_id: 'reviewer-b' });
+    t.eq('reopen to pending allowed', reopen.review_status, 'pending');
+    closeDb(db);
+  }
+
   // ── import workflow: CSV/manual input, review status, quality visibility ────
   {
     const db = buildDb();
