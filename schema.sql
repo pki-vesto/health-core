@@ -2,7 +2,7 @@
 -- Source of truth: scripts/lib/coredb.mjs (SCHEMA) + migrations/*.sql
 -- Regenerate: node scripts/dump-schema.mjs   |   verify: --check
 -- Runtime-only (created by scripts/migrate.mjs, not a migration): schema_migrations.
--- Tables: 14, Indexes: 6
+-- Tables: 14, Indexes: 8
 
 CREATE TABLE biomarker_reference_ranges (
   id          INTEGER PRIMARY KEY,
@@ -108,9 +108,12 @@ CREATE TABLE lab_results (
   panel          TEXT,
   report_id      TEXT,
   raw_payload    TEXT,
-  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')), review_status TEXT NOT NULL DEFAULT 'pending'
+  CHECK (review_status IN ('pending', 'approved', 'rejected')), reviewer_id TEXT, reviewed_at TEXT, biomarker_id TEXT REFERENCES biomarker_registry(metric_key), review_note TEXT, ingest_id INTEGER REFERENCES ingest_log(id), parsed_review TEXT,
   UNIQUE(lab_name, report_id)
 );
+CREATE INDEX idx_lab_results_ingest ON lab_results(ingest_id);
+CREATE INDEX idx_lab_results_review_status ON lab_results(review_status);
 
 CREATE TABLE metric_types (
   key          TEXT PRIMARY KEY,

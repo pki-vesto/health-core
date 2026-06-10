@@ -101,7 +101,7 @@ export function run() {
 
   {
     const out = migrate();
-    t.ok('fresh run applies all migrations', /done: 6 applied/.test(out), out.trim());
+    t.ok('fresh run applies all migrations', new RegExp(`done: ${migrationFiles().length} applied`).test(out), out.trim());
 
     const rerun = migrate();
     t.ok('re-run is idempotent (0 applied)', /done: 0 applied/.test(rerun), rerun.trim());
