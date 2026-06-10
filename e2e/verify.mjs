@@ -1,0 +1,30 @@
+import { chromium } from '@playwright/test';
+const base = process.env.BASE_URL || 'http://localhost:8099';
+const routes = ['today', 'insights', 'trends', 'recovery', 'training', 'nutrition', 'health', 'experiments', 'reports', 'datacore', 'settings'];
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1280, height: 880 } });
+const errors = [];
+p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+p.on('pageerror', (e) => errors.push('PAGEERROR ' + e.message));
+await p.goto(base + '/#today', { waitUntil: 'networkidle' });
+await p.waitForSelector('.sidebar', { timeout: 8000 });
+for (const r of routes) {
+  await p.goto(base + '/#' + r, { waitUntil: 'networkidle' });
+  await p.waitForTimeout(450);
+  const txt = await p.locator('#screen').innerText().catch(() => '');
+  const nav = await p.locator('.nav-item').count();
+  const bad = txt.includes('Fout bij laden') || txt.trim() === '' || txt.includes('Health Core laden');
+  console.log(`${r.padEnd(12)} nav=${nav} len=${String(txt.length).padStart(5)} ${bad ? '⚠ ' + txt.slice(0, 90).replace(/\n/g, ' ') : 'ok'}`);
+}
+await p.goto(base + '/#today', { waitUntil: 'networkidle' }); await p.waitForTimeout(500);
+await p.screenshot({ path: '/tmp/hc-today.png' });
+await p.evaluate(() => localStorage.setItem('hc-theme', 'dark'));
+await p.reload({ waitUntil: 'networkidle' }); await p.waitForTimeout(500);
+await p.screenshot({ path: '/tmp/hc-today-dark.png' });
+await p.goto(base + '/#trends', { waitUntil: 'networkidle' }); await p.waitForTimeout(500);
+await p.evaluate(() => localStorage.setItem('hc-theme', 'light'));
+await p.reload({ waitUntil: 'networkidle' }); await p.waitForTimeout(500);
+await p.screenshot({ path: '/tmp/hc-trends.png' });
+console.log('\nconsole errors:', errors.length);
+errors.slice(0, 8).forEach((e) => console.log('  - ' + e));
+await b.close();

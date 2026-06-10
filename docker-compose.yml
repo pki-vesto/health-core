@@ -1,0 +1,47 @@
+# Health Core — own deployment stack (independent of the shred app).
+#
+# core-api is the official read interface to the Core (goal 1). It opens
+# data/core.db with PRAGMA query_only=ON (hard read-only). The data dir is
+# mounted read/write at the filesystem level only because SQLite's WAL reader
+# needs to touch -shm/-wal; the engine still rejects every write on this
+# connection. shred-api remains the only writer (live dual-write).
+#
+# Reachability: published over HTTPS by a dedicated Tailscale sidecar at
+# https://healthcore.tail9d0c71.ts.net. Tailscale terminates TLS and proxies
+# plain HTTP to the API in the same network namespace. A loopback-only port is
+# kept for local smoke tests.
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: healthcore-ts
+    hostname: healthcore
+    restart: unless-stopped
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_HOSTNAME=healthcore
+      - TS_USERSPACE=true
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SERVE_CONFIG=/config/serve.json
+    volumes:
+      - ts_state:/var/lib/tailscale
+      - ./ts/serve.json:/config/serve.json:ro
+    ports:
+      - "127.0.0.1:8091:8090"
+
+  core-api:
+    build: ./api
+    image: health-core-api:latest
+    container_name: health-core-api
+    restart: unless-stopped
+    environment:
+      - PORT=8090
+      - CORE_DB=/core/core.db
+      # - CORE_BEARER_TOKEN=...   # set to require a bearer token on /api/v1
+    volumes:
+      - ./data:/core   # the Health Core (RW fs for WAL; query_only blocks writes)
+    network_mode: service:tailscale
+    depends_on:
+      - tailscale
+
+volumes:
+  ts_state:

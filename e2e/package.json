@@ -1,0 +1,13 @@
+{
+  "name": "health-core-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Playwright UI coverage for the Health Core web app (tasks #11/#12).",
+  "scripts": {
+    "test": "playwright test",
+    "install-browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
