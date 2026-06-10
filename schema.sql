@@ -109,8 +109,17 @@ CREATE TABLE lab_results (
   report_id      TEXT,
   raw_payload    TEXT,
   created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  review_status  TEXT NOT NULL DEFAULT 'pending' CHECK (review_status IN ('pending', 'approved', 'rejected')),
+  reviewer_id    TEXT,
+  reviewed_at    TEXT,
+  biomarker_id   TEXT REFERENCES biomarker_registry(metric_key),
+  review_note    TEXT,
+  ingest_id      INTEGER REFERENCES ingest_log(id),
+  parsed_review  TEXT,
   UNIQUE(lab_name, report_id)
 );
+CREATE INDEX idx_lab_results_ingest ON lab_results(ingest_id);
+CREATE INDEX idx_lab_results_review_status ON lab_results(review_status);
 
 CREATE TABLE metric_types (
   key          TEXT PRIMARY KEY,
@@ -160,4 +169,3 @@ CREATE TABLE symptom_categories (
   label       TEXT NOT NULL,
   description TEXT
 );
-

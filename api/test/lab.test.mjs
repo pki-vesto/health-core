@@ -3,7 +3,7 @@
 // non-committable handling, and idempotent commit into observations.
 import { fileURLToPath } from 'node:url';
 import { buildDb, closeDb, harness } from './fixtures.mjs';
-import { parseLab, commitLab } from '../lib/lab.js';
+import { commitLab, importLab, listLabResults, parseLab, reviewLabResult } from '../lib/lab.js';
 
 const PAYLOAD = {
   lab_name: 'Synthetic Lab', collected_at: '2026-05-01', panel: 'lipids+metabolic', report_id: 'R1',
@@ -63,11 +63,40 @@ export function run() {
     closeDb(db);
   }
 
+  // ── import workflow: CSV/manual input, review status, quality visibility ────
+  {
+    const db = buildDb();
+    const csv = 'test_name,value,unit,taken_at,reference_range\nLDL-C,3.1,mmol/L,2026-05-03,\nGlucose,95,mg/dL,2026-05-03,';
+    const p = importLab(db, { lab_name: 'CSV Lab', collected_at: '2026-05-03', panel: 'bloodwork', report_id: 'CSV1', file_content: csv });
+    t.eq('CSV import maps two biomarkers', { mapped: p.summary.mapped, committable: p.summary.committable }, { mapped: 2, committable: 2 });
+    const c = commitLab(db, { lab_name: 'CSV Lab', collected_at: '2026-05-03', panel: 'bloodwork', report_id: 'CSV1', file_content: csv });
+    const listed = listLabResults(db, { status: 'pending' });
+    t.eq('pending review row exposes accepted quality', { n: listed.length, status: listed[0].review_status, quality: listed[0].quality_status }, { n: 1, status: 'pending', quality: 'accepted' });
+    const reviewed = reviewLabResult(db, c.lab_result_id, { review_status: 'approved', reviewer_id: 'tester', biomarker_id: 'blood.ldl_cholesterol' });
+    t.eq('approve stores reviewer + biomarker link', { status: reviewed.review_status, reviewer: reviewed.reviewer_id, biomarker: reviewed.biomarker_id }, { status: 'approved', reviewer: 'tester', biomarker: 'blood.ldl_cholesterol' });
+    closeDb(db);
+  }
+
+  // ── quarantine/quality state from ingest is visible in review queue ─────────
+  {
+    const db = buildDb();
+    const bad = { lab_name: 'Quality Lab', collected_at: '2999-01-01', panel: 'future', report_id: 'Q1', results: [{ analyte: 'LDL-C', value: 3.1, unit: 'mmol/L' }] };
+    const c = commitLab(db, bad);
+    t.eq('future lab value quarantined by ingest', { written: c.ingest.records_written, quarantined: c.ingest.records_quarantined, quality: c.quality.status }, { written: 0, quarantined: 1, quality: 'quarantined' });
+    const q = listLabResults(db, { quarantineOnly: true })[0];
+    t.ok('quarantine reason surfaced', q && q.quality_status === 'quarantined' && /future timestamp/.test(q.quarantine_reason || ''), JSON.stringify(q));
+    closeDb(db);
+  }
+
   // ── parseLab rejects malformed reports ─────────────────────────────────────
   {
     const db = buildDb();
     t.throws('missing lab_name/results → 400', () => parseLab(db, { collected_at: '2026-05-01' }), 400);
     t.throws('bad collected_at → 400', () => parseLab(db, { lab_name: 'X', collected_at: 'nope', results: [{ analyte: 'LDL', value: 1 }] }), 400);
+    t.throws('approve without biomarker → 400', () => {
+      const c = commitLab(db, { lab_name: 'X', collected_at: '2026-05-01', report_id: 'X1', results: [{ analyte: 'LDL', value: 1, unit: 'mmol/L' }] });
+      reviewLabResult(db, c.lab_result_id, { review_status: 'approved' });
+    }, 400);
     closeDb(db);
   }
 

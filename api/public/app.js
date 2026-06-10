@@ -36,6 +36,12 @@ async function postJSON(path, body) {
   if (!r.ok) throw new Error(out.error || `${r.status} ${path}`);
   return out;
 }
+async function patchJSON(path, body) {
+  const r = await fetch(API + path, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const out = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(out.error || `${r.status} ${path}`);
+  return out;
+}
 const safe = (p) => getJSON(p).catch(() => null); // null on failure, never throws
 
 // ---------- metric model (design's summarize over real /series) ----------
@@ -646,13 +652,22 @@ function labPanel(prior) {
   const sample = JSON.stringify({ lab_name: 'Mijn Lab', collected_at: (state.serverDate || new Date().toISOString().slice(0, 10)), panel: 'lipiden+metabool', report_id: '', results: [{ analyte: 'LDL-C', value: 3.1, unit: 'mmol/L' }, { analyte: 'ApoB', value: 0.9, unit: 'g/L' }, { analyte: 'Glucose', value: 95, unit: 'mg/dL' }, { analyte: 'HbA1c', value: 5.4, unit: '%' }] }, null, 2);
   const list = (prior && prior.results) || [];
   return `<h2 style="font-size:20px;font-weight:750;letter-spacing:-0.02em;margin:0 0 14px">Lab import & review</h2>
-    <div class="card" style="margin-bottom:18px"><p class="muted" style="font-size:13px;margin:0 0 12px;line-height:1.5">Plak een labrapport als JSON. <b>Parse & review</b> koppelt elke waarde aan een biomarker, rekent eenheden om en toetst aan referentiebereiken — er wordt niets opgeslagen. Druk pas op <b>Vastleggen</b> als de review klopt.</p>
+    <div class="card" style="margin-bottom:18px">
+      <div class="cols-3" style="margin-bottom:12px">
+        <label class="field">CSV-bestand<input id="lab-file" type="file" accept=".csv,text/csv,application/json" /></label>
+        <label class="field">Reviewer<input id="lab-reviewer" value="local-reviewer" autocomplete="off" /></label>
+        <label class="field">Approve-link<select id="lab-biomarker"><option value="">Kies biomarker</option></select></label>
+      </div>
       <textarea id="lab-input" rows="11" spellcheck="false">${esc(sample)}</textarea>
       <div style="display:flex;gap:8px;align-items:center;margin-top:12px"><button class="btn primary" data-lab-parse>${icon('beaker', 14)}Parse & review</button><button class="btn" data-lab-commit disabled>${icon('check', 14)}Vastleggen</button><span id="lab-msg" class="muted" style="font-size:12.5px"></span></div>
     </div>
     <div id="lab-review"></div>
-    ${sectionTitle('Vastgelegde rapporten')}
-    <div class="card flush">${list.length ? `<table class="tbl"><thead><tr><th>Lab</th><th>Panel</th><th>Datum</th></tr></thead><tbody>${list.map((r) => `<tr><td style="font-weight:600">${esc(r.lab_name)}</td><td class="meta">${esc(r.panel || '')}</td><td class="mono">${esc(r.collected_at)}</td></tr>`).join('')}</tbody></table>` : `<div class="empty" style="border:none">Nog geen rapporten vastgelegd</div>`}</div>`;
+    ${sectionTitle('Review queue')}
+    <div class="card flush">${list.length ? `<table class="tbl"><thead><tr><th>Lab</th><th>Panel</th><th>Datum</th><th>Status</th><th>Kwaliteit</th><th>Acties</th></tr></thead><tbody>${list.map(labResultRow).join('')}</tbody></table>` : `<div class="empty" style="border:none">Nog geen rapporten vastgelegd</div>`}</div>`;
+}
+function labResultRow(r) {
+  const qs = r.quality_status || 'not_ingested';
+  return `<tr><td style="font-weight:600">${esc(r.lab_name || '')}<div class="meta mono" style="font-size:11px">#${esc(r.id)} ${r.report_id ? '· ' + esc(r.report_id) : ''}</div></td><td class="meta">${esc(r.panel || '')}</td><td class="mono">${esc(r.collected_at)}</td><td><span class="pill ${r.review_status === 'approved' ? 'good' : r.review_status === 'rejected' ? 'risk' : 'warn'}">${esc(r.review_status || 'pending')}</span>${r.biomarker_id ? `<div class="meta mono" style="font-size:11px">${esc(r.biomarker_id)}</div>` : ''}</td><td><span class="pill ${qs === 'accepted' ? 'good' : qs === 'partial' || qs === 'quarantined' ? 'warn' : ''}">${esc(qs)}</span>${r.quarantine_reason ? `<div class="meta" style="font-size:11px;max-width:260px">${esc(r.quarantine_reason)}</div>` : ''}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn mini" data-lab-review-id="${esc(r.id)}" data-lab-review-status="approved">${icon('check', 13)}OK</button><button class="btn mini" data-lab-review-id="${esc(r.id)}" data-lab-review-status="rejected">${icon('close', 13)}Afwijs</button></div></td></tr>`;
 }
 function labReview(p) {
   const rows = p.results.map((r) => `<div class="row labrow${r.committable ? '' : ' bad'}"><span>${esc(r.analyte)} <small class="muted">→ ${esc(r.metric)}</small>${r.converted_from ? ` <small class="muted">(${esc(r.converted_from)})</small>` : ''}${r.issues && r.issues.length ? `<br><small style="color:var(--warn)">${esc(r.issues.join('; '))}</small>` : ''}</span><span class="mono">${esc(String(r.value ?? '—'))} ${esc(r.unit || '')}</span><span class="pill tag-stat ${esc(r.status)}">${esc(r.status)}</span></div>`).join('');
@@ -850,22 +865,51 @@ function moreSheet() {
 }
 
 // ============================================================ LAB wiring
+async function labPayload() {
+  const input = document.getElementById('lab-input');
+  const file = document.getElementById('lab-file')?.files?.[0];
+  if (!file) return JSON.parse(input.value);
+  const text = await file.text();
+  if (file.name.toLowerCase().endsWith('.json')) return JSON.parse(text);
+  const base = JSON.parse(input.value || '{}');
+  return { ...base, file_content: text, filename: file.name };
+}
+async function labLoadBiomarkers() {
+  const sel = document.getElementById('lab-biomarker');
+  if (!sel || sel.dataset.loaded) return;
+  const reg = await safe('/biomarkers/registry');
+  const rows = reg && reg.biomarkers || [];
+  sel.insertAdjacentHTML('beforeend', rows.map((b) => `<option value="${esc(b.metric_key)}">${esc(humanMetric(b.metric_key))}</option>`).join(''));
+  sel.dataset.loaded = '1';
+}
 async function labParse() {
   const input = document.getElementById('lab-input'); const msg = document.getElementById('lab-msg'); const review = document.getElementById('lab-review'); const commit = document.querySelector('[data-lab-commit]');
-  let payload; try { payload = JSON.parse(input.value); } catch (e) { msg.textContent = 'Ongeldige JSON: ' + e.message; commit.disabled = true; return; }
-  try { const p = await postJSON('/lab/parse', payload); review.innerHTML = labReview(p); msg.textContent = `${p.summary.committable}/${p.summary.mapped} vastlegbaar · ${p.summary.abnormal} afwijkend · ${p.summary.unmapped} ongekoppeld`; commit.disabled = p.summary.committable === 0; }
+  let payload; try { payload = await labPayload(); } catch (e) { msg.textContent = 'Ongeldige invoer: ' + e.message; commit.disabled = true; return; }
+  try { const p = await postJSON('/lab/import', payload); review.innerHTML = labReview(p); msg.textContent = `${p.summary.committable}/${p.summary.mapped} vastlegbaar · ${p.summary.abnormal} afwijkend · ${p.summary.unmapped} ongekoppeld`; commit.disabled = p.summary.committable === 0; }
   catch (e) { msg.textContent = 'Parse mislukt: ' + e.message; commit.disabled = true; }
 }
 async function labCommit() {
   const input = document.getElementById('lab-input'); const msg = document.getElementById('lab-msg');
-  let payload; try { payload = JSON.parse(input.value); } catch { msg.textContent = 'Ongeldige JSON'; return; }
-  try { const c = await postJSON('/lab/commit', payload); msg.textContent = `Vastgelegd: ${c.committed} observatie(s) → rapport #${c.lab_result_id}`; document.querySelector('[data-lab-commit]').disabled = true; cache.delete('/lab/results'); }
+  let payload; try { payload = await labPayload(); } catch { msg.textContent = 'Ongeldige invoer'; return; }
+  try { const c = await postJSON('/lab/commit', payload); msg.textContent = `Vastgelegd: ${c.committed} observatie(s) → rapport #${c.lab_result_id} · kwaliteit ${c.quality.status}`; document.querySelector('[data-lab-commit]').disabled = true; cache.delete('/lab/results'); renderScreen(); }
   catch (e) { msg.textContent = 'Vastleggen mislukt: ' + e.message; }
+}
+async function labReviewAction(id, status) {
+  const msg = document.getElementById('lab-msg');
+  const biomarker = document.getElementById('lab-biomarker')?.value || '';
+  const reviewer = document.getElementById('lab-reviewer')?.value || 'local-reviewer';
+  try {
+    await patchJSON(`/lab/results/${id}`, { review_status: status, reviewer_id: reviewer, biomarker_id: status === 'approved' ? biomarker : null });
+    cache.delete('/lab/results');
+    renderScreen();
+  } catch (e) {
+    if (msg) msg.textContent = 'Review mislukt: ' + e.message;
+  }
 }
 
 // ============================================================ EVENT DELEGATION
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-nav],[data-theme-toggle],[data-open-insight],[data-insights-filter],[data-trends-range],[data-trends-metric],[data-exp-tab],[data-health-tab],[data-more],[data-close-sheet],[data-open-report],[data-set-theme],[data-set-accent],[data-set-density],[data-set-font],[data-lab-parse],[data-lab-commit]');
+  const t = e.target.closest('[data-nav],[data-theme-toggle],[data-open-insight],[data-insights-filter],[data-trends-range],[data-trends-metric],[data-exp-tab],[data-health-tab],[data-more],[data-close-sheet],[data-open-report],[data-set-theme],[data-set-accent],[data-set-density],[data-set-font],[data-lab-parse],[data-lab-commit],[data-lab-review-id]');
   if (!t) return;
   if (t.dataset.nav != null) return nav(t.dataset.nav, { metric: t.dataset.metric });
   if (t.dataset.themeToggle != null) return setTheme(state.theme === 'dark' ? 'light' : 'dark');
@@ -884,7 +928,9 @@ document.addEventListener('click', (e) => {
   if (t.dataset.setFont != null) { state.font = t.dataset.setFont; localStorage.setItem('hc-font', state.font); applyTheme(); return renderScreen(); }
   if (t.dataset.labParse != null) return labParse();
   if (t.dataset.labCommit != null) return labCommit();
+  if (t.dataset.labReviewId != null) return labReviewAction(t.dataset.labReviewId, t.dataset.labReviewStatus);
 });
+document.addEventListener('focusin', (e) => { if (e.target && e.target.id === 'lab-biomarker') labLoadBiomarkers(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
 
 // ============================================================ INIT
@@ -910,4 +956,3 @@ async function init() {
   } catch {}
 }
 init();
-
