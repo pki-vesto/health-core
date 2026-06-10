@@ -1,0 +1,119 @@
+{
+  "meta": {
+    "name": "intelligence-math golden references",
+    "timezone": "Europe/Amsterdam",
+    "to": "2026-03-01",
+    "source": "Hand-computed from the production formulas in api/lib/intelligence.js and api/lib/series.js; Pearson partial case cross-checked against r = 6 / sqrt(60).",
+    "float_tolerance": 0.0001
+  },
+  "baselines": [
+    {
+      "name": "body weight outlier baseline",
+      "metric": "body.weight",
+      "start": "2026-02-15",
+      "values": [80, 80, 80, 80, 90],
+      "expected": {
+        "metric": "body.weight",
+        "n": 5,
+        "baseline": 82,
+        "latest": 90,
+        "sd": 4,
+        "z": 2
+      }
+    },
+    {
+      "name": "constant HRV baseline",
+      "metric": "heart.hrv_sdnn",
+      "start": "2026-02-15",
+      "values": [60, 60, 60],
+      "expected": {
+        "metric": "heart.hrv_sdnn",
+        "n": 3,
+        "baseline": 60,
+        "latest": 60,
+        "sd": 0,
+        "z": 0
+      }
+    }
+  ],
+  "correlations": [
+    {
+      "name": "perfect positive",
+      "xMetric": "body.weight",
+      "yMetric": "nutrition.calories",
+      "start": "2026-02-20",
+      "x": [1, 2, 3, 4, 5],
+      "y": [2, 4, 6, 8, 10],
+      "expected": {
+        "a": "body.weight",
+        "b": "nutrition.calories",
+        "n": 5,
+        "r": 1
+      }
+    },
+    {
+      "name": "known partial pearson",
+      "xMetric": "body.weight",
+      "yMetric": "nutrition.calories",
+      "start": "2026-02-20",
+      "x": [1, 2, 3, 4, 5],
+      "y": [2, 4, 5, 4, 5],
+      "expected": {
+        "a": "body.weight",
+        "b": "nutrition.calories",
+        "n": 5,
+        "r": 0.7746
+      }
+    },
+    {
+      "name": "constant vector returns zero",
+      "xMetric": "body.weight",
+      "yMetric": "nutrition.calories",
+      "start": "2026-02-20",
+      "x": [80, 80, 80],
+      "y": [2000, 2100, 2200],
+      "expected": {
+        "a": "body.weight",
+        "b": "nutrition.calories",
+        "n": 3,
+        "r": 0
+      }
+    }
+  ],
+  "readiness": {
+    "name": "experiment readiness threshold",
+    "metric": "body.weight",
+    "start": "2026-02-01",
+    "values": [80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80],
+    "expected": {
+      "n": 14,
+      "ready": true
+    }
+  },
+  "risk": {
+    "name": "glucose rising risk",
+    "metric": "blood.glucose",
+    "start": "2026-02-20",
+    "values": [5, 5.5, 6],
+    "source": "lab",
+    "expected": {
+      "indicatorTypes": ["deterioration", "sudden_change"],
+      "risk_score": 24,
+      "metabolic": 2,
+      "cardiovascular": 0
+    }
+  },
+  "scores": {
+    "recovery": {
+      "name": "sleep HRV RHR recovery score",
+      "series": [
+        { "metric": "sleep.duration", "start": "2026-02-20", "values": [7, 8, 9] },
+        { "metric": "heart.hrv_sdnn", "start": "2026-02-20", "values": [40, 60, 50] },
+        { "metric": "heart.resting_rate", "start": "2026-02-20", "values": [60, 50, 55] }
+      ],
+      "expected": {
+        "recovery_score": 66.67
+      }
+    }
+  }
+}

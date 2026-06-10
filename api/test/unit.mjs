@@ -6,6 +6,7 @@
 //
 // Each module exports run() → number of failures.
 import { run as intelligence } from './intelligence.test.mjs';
+import { run as intelligenceGolden } from './intelligence-golden.test.mjs';
 import { run as healthOs } from './health-os.test.mjs';
 import { run as platform } from './platform.test.mjs';
 import { run as migration } from './migration.test.mjs';
@@ -18,6 +19,7 @@ import { run as track } from './track.test.mjs';
 
 const SUITES = [
   ['intelligence', intelligence],
+  ['intelligence-golden', intelligenceGolden],
   ['health-os', healthOs],
   ['platform', platform],
   ['migration', migration],
