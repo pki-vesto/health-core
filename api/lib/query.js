@@ -5,6 +5,7 @@
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const AGGS = new Set(['avg', 'sum', 'min', 'max', 'count']);
 const BUCKETS = new Set(['day', 'week', 'month']);
+export const EXPORT_JSON_MAX = 10000;
 
 export function isDate(s) {
   return typeof s === 'string' && DATE_RE.test(s);
@@ -12,6 +13,9 @@ export function isDate(s) {
 
 export class BadRequest extends Error {
   constructor(msg) { super(msg); this.status = 400; }
+}
+export class PayloadTooLarge extends Error {
+  constructor(msg) { super(msg); this.status = 413; }
 }
 
 // ── Source precedence (multi-source same-day conflict policy) ─────────────────
@@ -58,31 +62,13 @@ export function listSources(db) {
 
 // ── Observations ─────────────────────────────────────────────────────────────
 export function queryObservations(db, params = {}) {
-  const { metric, from, to, source } = params;
   let limit = parseInt(params.limit ?? '500', 10);
   let offset = parseInt(params.offset ?? '0', 10);
   if (!Number.isFinite(limit) || limit < 1) limit = 500;
   limit = Math.min(limit, 5000);
   if (!Number.isFinite(offset) || offset < 0) offset = 0;
 
-  const clauses = [];
-  const args = {};
-  if (metric != null) {
-    if (!metricExists(db, metric)) throw new BadRequest(`unknown metric '${metric}'`);
-    clauses.push('o.metric_type = @metric'); args.metric = metric;
-  }
-  if (from != null) {
-    if (!isDate(from)) throw new BadRequest('from must be YYYY-MM-DD');
-    clauses.push('o.timestamp >= @from'); args.from = from;
-  }
-  if (to != null) {
-    if (!isDate(to)) throw new BadRequest('to must be YYYY-MM-DD');
-    clauses.push('o.timestamp <= @to'); args.to = to;
-  }
-  if (source != null) {
-    clauses.push('s.name = @source'); args.source = source;
-  }
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const { where, args } = observationFilter(db, params);
 
   const rows = db.prepare(
     `SELECT o.timestamp, o.metric_type, o.value, o.unit, s.name AS source,
@@ -101,6 +87,39 @@ export function queryObservations(db, params = {}) {
     total, limit, offset,
     rows: rows.map(r => ({ ...r, metadata: safeJson(r.metadata) }))
   };
+}
+
+export function exportObservationCount(db, params = {}) {
+  const { where, args } = observationFilter(db, params);
+  return db.prepare(
+    `SELECT COUNT(*) AS n FROM observations o JOIN sources s ON s.id = o.source ${where}`
+  ).get(args).n;
+}
+
+export function exportObservations(db, params = {}) {
+  const { where, args } = observationFilter(db, params);
+  return db.prepare(
+    `SELECT o.timestamp, o.metric_type, o.value, o.unit, s.name AS source,
+            o.external_id, o.source_updated_at, o.metadata, o.updated_at
+       FROM observations o JOIN sources s ON s.id = o.source
+       ${where}
+       ORDER BY o.timestamp ASC, o.metric_type ASC, s.name ASC, o.external_id ASC`
+  ).iterate(args);
+}
+
+export function exportObservationsJson(db, params = {}) {
+  const max = parseMax(params.max);
+  const count = exportObservationCount(db, params);
+  if (count > max) throw new PayloadTooLarge(`export too large for JSON form: ${count} rows exceeds max ${max}`);
+  return {
+    exported_at: new Date().toISOString(),
+    count,
+    observations: [...exportObservations(db, params)].map(exportRow)
+  };
+}
+
+export function exportRow(row) {
+  return { ...row, metadata: safeJson(row.metadata) };
 }
 
 // Latest observation per metric (Today Snapshot precursor). Optional metric
@@ -181,3 +200,34 @@ export function stats(db) {
 
 function safeJson(s) { try { return s ? JSON.parse(s) : null; } catch { return s; } }
 function round4(x) { return x == null ? null : Math.round(Number(x) * 1e4) / 1e4; }
+
+function observationFilter(db, params = {}) {
+  const { metric, from, to, source } = params;
+  const clauses = [];
+  const args = {};
+  if (metric != null) {
+    if (!metricExists(db, metric)) throw new BadRequest(`unknown metric '${metric}'`);
+    clauses.push('o.metric_type = @metric'); args.metric = metric;
+  }
+  if (from != null) {
+    if (!isDate(from)) throw new BadRequest('from must be YYYY-MM-DD');
+    clauses.push('o.timestamp >= @from'); args.from = from;
+  }
+  if (to != null) {
+    if (!isDate(to)) throw new BadRequest('to must be YYYY-MM-DD');
+    clauses.push('o.timestamp <= @to'); args.to = to;
+  }
+  if (source != null) {
+    clauses.push('s.name = @source'); args.source = source;
+  }
+  return { where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', args };
+}
+
+function parseMax(raw) {
+  if (raw == null) return EXPORT_JSON_MAX;
+  const max = parseInt(raw, 10);
+  if (!Number.isFinite(max) || max < 1 || max > EXPORT_JSON_MAX) {
+    throw new BadRequest(`max must be an integer from 1 to ${EXPORT_JSON_MAX}`);
+  }
+  return max;
+}
