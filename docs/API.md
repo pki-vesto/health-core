@@ -143,6 +143,7 @@ not included in the prompt text and are not invented by the implementation.
   health briefings and reports.
 - `GET /api/v1/health-profile` — personal health profile.
 - `GET /api/v1/health-goals` — goal registry.
+- `GET /api/v1/milestones` — persisted health milestones.
 - `GET /api/v1/progress` — progress monitoring.
 - `GET /api/v1/decision-support` — informational decision support.
 - `GET /api/v1/operating-system` — combined personal Health Operating System
@@ -169,6 +170,11 @@ ingests them. Unknown metric names are reported in `skipped`, not quarantined.
 ### `POST /api/v1/ingest/:id/replay` — replay a logged ingest (goal 8)
 Re-runs an `ingest_log` entry from its stored raw payload. Idempotent (LWW) →
 typically `records_written: 0` unless the data changed since.
+
+### `POST /api/v1/milestones/detect` — detect and persist health milestones
+Runs idempotent milestone detection over existing observations and writes only
+new `health_milestones` rows. Does not mutate observations. →
+`{ detected, written }`.
 
 ### `GET /api/v1/ingest` — audit log (goal 7) · `GET /api/v1/ingest/:id`
 `?full=1` includes the raw payload. → `{ ingests:[…] }`.

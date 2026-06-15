@@ -16,6 +16,7 @@ import { run as math } from './math.test.mjs';
 import { run as precedence } from './precedence.test.mjs';
 import { run as decisionSupport } from './decision-support.test.mjs';
 import { run as track } from './track.test.mjs';
+import { run as milestones } from './milestones.test.mjs';
 import { run as exportBackup } from './export-backup.test.mjs';
 
 const SUITES = [
@@ -30,6 +31,7 @@ const SUITES = [
   ['precedence', precedence],
   ['decision-support', decisionSupport],
   ['track', track],
+  ['milestones', milestones],
   ['export-backup', exportBackup]
 ];
 

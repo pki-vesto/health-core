@@ -1867,8 +1867,8 @@ The audit uses code/schema/API/runtime evidence. It does not treat documentation
     "domain_title": "Longitudinal intelligence",
     "title": "Build health milestones",
     "classification": "complete",
-    "code_evidence": "health_milestones + GET /api/v1/longitudinal",
-    "reason": "Code contains an API contract and, where applicable, a visible UI workflow or integrated dashboard route; smoke tests cover the route family."
+    "code_evidence": "api/lib/milestones.js + scripts/detect-milestones.mjs + GET/POST /api/v1/milestones + UI trends milestones",
+    "reason": "Milestones are detected from observations, persisted idempotently to health_milestones, surfaced through API and shown in the trends UI."
   },
   {
     "number": 207,

@@ -60,6 +60,8 @@ Date: 2026-06-09
 - Manual "Track" screen restored: the UI can write daily manual observations
   through the generic ingest path with stable correction semantics. Biomarker
   entry remains the Lab tab.
+- Health milestones now have an idempotent detector, script/POST entrypoint,
+  persisted read route and trends UI list.
 - Single pre-deploy gate added at `scripts/check.mjs`: offline unit,
   governance and schema checks always run; smoke/e2e are conditional.
 - Verified: Playwright e2e rewritten to the new DOM (7 tests) — green vs demo AND
@@ -70,4 +72,4 @@ Date: 2026-06-09
 - Real Apple Health export verification (external: phone export; tooling ready).
 - Real lab report format validation (external: sample reports; parser ready).
 - FEATURE_AUDIT re-classification.
-- Manual quick-log UI restored; continue hardening with real usage data.
+- Manual quick-log and health milestones restored; continue hardening with real usage data.
