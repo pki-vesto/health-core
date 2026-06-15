@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const VIEWS = ['today', 'insights', 'trends', 'recovery', 'training', 'nutrition', 'health', 'experiments', 'reports', 'datacore', 'settings'];
+const VIEWS = ['today', 'track', 'insights', 'trends', 'recovery', 'training', 'nutrition', 'health', 'experiments', 'reports', 'datacore', 'settings'];
 
 test('every view navigates via the sidebar and renders without error', async ({ page }) => {
   await page.goto('/#today');
