@@ -1,5 +1,8 @@
+import { createHash } from 'node:crypto';
 import { BadRequest, isDate, preferLatest } from './query.js';
 import { dashboard, correlations } from './intelligence.js';
+
+export const BRIEFING_PERIODS = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
 
 const BIOMARKERS = [
   'blood.total_cholesterol',
@@ -144,13 +147,136 @@ export function brief(db, period = 'daily') {
   const d = dashboard(db, { days });
   return {
     period,
-    generated_at: new Date().toISOString(),
+    generated_at: amsterdamNowIso(),
     summary: d.summary,
     highlights: d.cards.slice(0, 6),
     alerts: d.alerts,
     decisions: decisionSupport(db).recommendations,
     disclaimer: DECISION_DISCLAIMER
   };
+}
+
+// ── Briefing persistence (issue #32) ─────────────────────────────────────────
+// `brief()` recomputes; this helper persists each result so /briefing/history
+// and /briefing/:id/diff can stand on a stable artifact. Day-bucket via
+// Europe/Amsterdam (NOT UTC) so dedupe-by-day stays correct across midnight
+// local time. Dedupe by (period, payload_sha256, day) returns the existing row
+// id rather than creating a duplicate row when the same briefing is regenerated
+// the same day.
+export function snapshotBriefing(db, briefing, { period } = {}) {
+  const periodKey = period || briefing?.period;
+  if (!BRIEFING_PERIODS.includes(periodKey)) {
+    throw new BadRequest(`unknown briefing period '${periodKey}'`);
+  }
+  let payload;
+  try {
+    payload = JSON.stringify(briefing);
+  } catch {
+    return { id: null, deduped: false, skipped: true };
+  }
+  const sha = sha256Hex(payload);
+  const generatedAt = briefing?.generated_at || amsterdamNowIso();
+  const day = generatedAt.slice(0, 10);
+  const existing = db.prepare(
+    `SELECT id FROM briefing_snapshots
+      WHERE period = ? AND payload_sha256 = ? AND substr(generated_at, 1, 10) = ?
+      LIMIT 1`
+  ).get(periodKey, sha, day);
+  if (existing) return { id: existing.id, deduped: true };
+  const summary = briefing && typeof briefing.summary === 'object' && briefing.summary !== null
+    ? JSON.stringify(briefing.summary)
+    : (briefing?.summary ?? null);
+  const info = db.prepare(
+    `INSERT INTO briefing_snapshots (period, generated_at, payload, payload_sha256, summary)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(periodKey, generatedAt, payload, sha, summary);
+  return { id: Number(info.lastInsertRowid), deduped: false };
+}
+
+// Generate + persist in one call. The read API uses this so every served brief
+// is also a row in briefing_snapshots; callers get the snapshot id back so they
+// can immediately /briefing/:id and /:id/diff.
+export function briefAndSnapshot(readDb, writeDb, period = 'daily') {
+  const briefing = brief(readDb, period);
+  let snap = { id: null, deduped: false, skipped: true };
+  try { snap = snapshotBriefing(writeDb, briefing, { period }); }
+  catch { /* never break the read path on a persistence failure */ }
+  return { ...briefing, snapshot_id: snap.id, deduped: !!snap.deduped };
+}
+
+export function listBriefingSnapshots(db, { period, limit = 20 } = {}) {
+  if (period != null && !BRIEFING_PERIODS.includes(period)) {
+    throw new BadRequest(`unknown briefing period '${period}'`);
+  }
+  const n = clampInt(limit, 20, 1, 100);
+  const args = [];
+  let where = '';
+  if (period) { where = 'WHERE period = ?'; args.push(period); }
+  args.push(n);
+  return db.prepare(
+    `SELECT id, period, generated_at, summary
+       FROM briefing_snapshots ${where}
+      ORDER BY generated_at DESC, id DESC
+      LIMIT ?`
+  ).all(...args).map(r => ({ ...r, summary: safeJson(r.summary) }));
+}
+
+export function getBriefingSnapshot(db, id) {
+  const row = db.prepare(
+    `SELECT id, period, generated_at, payload, payload_sha256, summary
+       FROM briefing_snapshots WHERE id = ?`
+  ).get(id);
+  if (!row) return null;
+  return { ...row, payload: safeJson(row.payload) };
+}
+
+export function priorBriefingSnapshot(db, { period, id }) {
+  const row = db.prepare(
+    `SELECT id, period, generated_at, payload, payload_sha256, summary
+       FROM briefing_snapshots
+      WHERE period = ? AND id < ?
+      ORDER BY id DESC LIMIT 1`
+  ).get(period, id);
+  if (!row) return null;
+  return { ...row, payload: safeJson(row.payload) };
+}
+
+function amsterdamNowIso(d = new Date()) {
+  // ISO8601 in Europe/Amsterdam (with offset suffix). Built from Intl parts so
+  // the day-bucket prefix (substr 1..10) is the local civil date — not UTC.
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Amsterdam',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(d).filter(p => p.type !== 'literal').map(p => [p.type, p.value]));
+  // Hour can be '24' on some runtimes for midnight; coerce to '00'.
+  const hh = parts.hour === '24' ? '00' : parts.hour;
+  const offset = amsterdamOffset(d);
+  return `${parts.year}-${parts.month}-${parts.day}T${hh}:${parts.minute}:${parts.second}${offset}`;
+}
+
+function amsterdamOffset(d) {
+  // Amsterdam = CET (UTC+1) in winter, CEST (UTC+2) in summer. Compute by
+  // diffing the same wall clock interpreted in UTC vs Europe/Amsterdam.
+  const local = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Amsterdam' }));
+  const utc = new Date(d.toLocaleString('en-US', { timeZone: 'UTC' }));
+  const mins = Math.round((local - utc) / 60000);
+  const sign = mins >= 0 ? '+' : '-';
+  const abs = Math.abs(mins);
+  const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+  const mm = String(abs % 60).padStart(2, '0');
+  return `${sign}${hh}:${mm}`;
+}
+
+function sha256Hex(s) {
+  return createHash('sha256').update(s).digest('hex');
+}
+
+function safeJson(s) {
+  if (s == null) return null;
+  try { return JSON.parse(s); } catch { return s; }
 }
 
 export function healthProfile(db) {
