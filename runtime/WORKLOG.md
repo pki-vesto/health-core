@@ -36,8 +36,9 @@ Date: 2026-06-09
 - `schema.sql` is now generated + drift-checked; governance consistency check added.
 - Playwright UI suite (`e2e/`, 17 tests) incl. reports view extended with
   quarterly/yearly briefings.
-- Found + recorded (not yet fixed) a dead `heart.resting_rate` branch in
-  `platform.js fatigueScore` (see audit/TECH_DEBT.md).
+- Fixed the dead `heart.resting_rate` branch in `platform.js fatigueScore` by
+  computing RHR locally for fatigue scoring; high recovery warnings and
+  overtraining are now reachable in `api/test/platform.test.mjs`.
 
 ## 2026-06-09 — UI redesign ("Personal Health OS", Claude Design handoff)
 
