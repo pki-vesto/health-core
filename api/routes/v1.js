@@ -1,6 +1,8 @@
-// Versioned read API (v1) over the Core. All routes are pure reads.
+// Versioned read API (v1) over the Core. Briefing generators (/briefing/:period)
+// persist a snapshot via the dedicated write connection (issue #32); everything
+// else is pure read.
 import { Router } from 'express';
-import { db } from '../db.js';
+import { db, writeDb } from '../db.js';
 import * as q from '../lib/query.js';
 import { runIntegrity } from '../lib/integrity.js';
 import * as intel from '../lib/intelligence.js';
@@ -123,20 +125,24 @@ v1.get('/stress/dashboard', h((req, res) => {
 v1.get('/stress/alerts', h((req, res) => {
   res.json({ alerts: hos.stressSummary(db(), req.query).alerts });
 }));
+// Briefing generators — persist each result to briefing_snapshots so /history,
+// /:id and /:id/diff can return a stable artifact (issue #32). Dedupe within
+// the same Europe/Amsterdam day by payload_sha256, so regenerating an
+// identical briefing returns the existing snapshot id rather than duplicating.
 v1.get('/briefing/daily', h((_req, res) => {
-  res.json(hos.brief(db(), 'daily'));
+  res.json(hos.briefAndSnapshot(db(), writeDb(), 'daily'));
 }));
 v1.get('/briefing/weekly', h((_req, res) => {
-  res.json(hos.brief(db(), 'weekly'));
+  res.json(hos.briefAndSnapshot(db(), writeDb(), 'weekly'));
 }));
 v1.get('/briefing/monthly', h((_req, res) => {
-  res.json(hos.brief(db(), 'monthly'));
+  res.json(hos.briefAndSnapshot(db(), writeDb(), 'monthly'));
 }));
 v1.get('/briefing/quarterly', h((_req, res) => {
-  res.json(hos.brief(db(), 'quarterly'));
+  res.json(hos.briefAndSnapshot(db(), writeDb(), 'quarterly'));
 }));
 v1.get('/briefing/yearly', h((_req, res) => {
-  res.json(hos.brief(db(), 'yearly'));
+  res.json(hos.briefAndSnapshot(db(), writeDb(), 'yearly'));
 }));
 v1.get('/health-profile', h((_req, res) => {
   res.json(hos.healthProfile(db()));

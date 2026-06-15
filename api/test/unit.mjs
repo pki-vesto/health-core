@@ -18,6 +18,9 @@ import { run as decisionSupport } from './decision-support.test.mjs';
 import { run as track } from './track.test.mjs';
 import { run as milestones } from './milestones.test.mjs';
 import { run as exportBackup } from './export-backup.test.mjs';
+import { run as briefingSnapshot } from './briefing-snapshot.test.mjs';
+import { run as briefingDiff } from './briefing-diff.test.mjs';
+import { run as briefingRoutes } from './briefing-routes.test.mjs';
 
 const SUITES = [
   ['intelligence', intelligence],
@@ -32,13 +35,19 @@ const SUITES = [
   ['decision-support', decisionSupport],
   ['track', track],
   ['milestones', milestones],
-  ['export-backup', exportBackup]
+  ['export-backup', exportBackup],
+  ['briefing-snapshot', briefingSnapshot],
+  ['briefing-diff', briefingDiff],
+  ['briefing-routes', briefingRoutes]
 ];
 
 let total = 0;
 for (const [name, run] of SUITES) {
   try {
-    total += run();
+    // A suite's run() may return a number (sync) or a Promise<number> (async,
+    // e.g. the briefing-routes HTTP test). Await unconditionally — sync values
+    // resolve to themselves.
+    total += await run();
   } catch (e) {
     total += 1;
     console.error(`  ✗ suite '${name}' threw — ${e.stack || e.message}`);

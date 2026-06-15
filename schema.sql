@@ -2,7 +2,7 @@
 -- Source of truth: scripts/lib/coredb.mjs (SCHEMA) + migrations/*.sql
 -- Regenerate: node scripts/dump-schema.mjs   |   verify: --check
 -- Runtime-only (created by scripts/migrate.mjs, not a migration): schema_migrations.
--- Tables: 14, Indexes: 8
+-- Tables: 15, Indexes: 10
 
 CREATE TABLE biomarker_reference_ranges (
   id          INTEGER PRIMARY KEY,
@@ -26,6 +26,19 @@ CREATE TABLE biomarker_registry (
   loinc       TEXT,
   description TEXT
 );
+
+CREATE TABLE briefing_snapshots (
+  id             INTEGER PRIMARY KEY,
+  period         TEXT NOT NULL,
+  generated_at   TEXT NOT NULL,         -- ISO8601 in Europe/Amsterdam
+  payload        TEXT NOT NULL,         -- JSON.stringify(briefing)
+  payload_sha256 TEXT NOT NULL,
+  summary        TEXT
+);
+CREATE INDEX idx_briefing_snapshots_period_generated_at
+  ON briefing_snapshots(period, generated_at);
+CREATE INDEX idx_briefing_snapshots_period_sha
+  ON briefing_snapshots(period, payload_sha256);
 
 CREATE TABLE derived_metrics (
   id              INTEGER PRIMARY KEY,

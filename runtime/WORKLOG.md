@@ -67,6 +67,28 @@ Date: 2026-06-09
 - Verified: Playwright e2e rewritten to the new DOM (7 tests) — green vs demo AND
   live; smoke 91/91; unit 10 suites green. Deployed live (:8091).
 
+## 2026-06-15 — Briefing snapshots + history/diff (issue #32)
+
+- Additive migration `008_briefing_history.sql` adds `briefing_snapshots`
+  (id/period/generated_at/payload/payload_sha256/summary) plus two indexes.
+  `schema.sql` regenerated (15 tables, 10 indexes).
+- `api/lib/health-os.js` gained `snapshotBriefing()`, `briefAndSnapshot()`,
+  `listBriefingSnapshots()`, `getBriefingSnapshot()`, `priorBriefingSnapshot()`.
+  Each generated briefing is now persisted by the v1 `/briefing/:period`
+  generators via `writeDb()`, dedupe-by-day on `(period, payload_sha256,
+  substr(generated_at,1,10))`; `brief.generated_at` is built in Europe/Amsterdam
+  so day-bucketing is timezone-correct across midnight UTC.
+- `api/lib/briefing-diff.js` — pure `diffBriefings(prev, next)` returning
+  `{ first, summary, highlights, alerts, decisions }` with added/removed/changed.
+- New `api/routes/briefing.js` mounts `GET /briefing/history`, `/briefing/:id`,
+  `/briefing/:id/diff` (and `/:id?diff=prior` inline form). Read-only.
+- Tests added (3 suites, 53 assertions): `briefing-snapshot.test.mjs` (persist +
+  dedupe + history ordering), `briefing-diff.test.mjs` (added/removed/changed +
+  first-shot shape), `briefing-routes.test.mjs` (HTTP handlers incl. 400/404 +
+  no-prior diff). `migration.test.mjs` now requires `briefing_snapshots`.
+- `unit.mjs` now awaits suite results so the async HTTP route suite can join the
+  aggregate run. Full suite green (16/16). Governance + schema drift clean.
+
 ## Still Open
 
 - Real Apple Health export verification (external: phone export; tooling ready).

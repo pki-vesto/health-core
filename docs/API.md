@@ -140,7 +140,17 @@ not included in the prompt text and are not invented by the implementation.
 - `GET /api/v1/stress/dashboard` — stress dashboard projection.
 - `GET /api/v1/stress/alerts` — stress warnings.
 - `GET /api/v1/briefing/daily|weekly|monthly|quarterly|yearly` — personal
-  health briefings and reports.
+  health briefings and reports. Each generation is persisted to
+  `briefing_snapshots`; identical regeneration the same Europe/Amsterdam day is
+  deduped on `payload_sha256`. The response includes the `snapshot_id` and a
+  `deduped` flag so clients can immediately fetch or diff the stored artifact.
+- `GET /api/v1/briefing/history?period=daily&limit=20` — recent snapshots
+  (`id, period, generated_at, summary`), most recent first.
+- `GET /api/v1/briefing/:id` — the stored briefing snapshot.
+- `GET /api/v1/briefing/:id/diff` (or `/:id?diff=prior`) — structured diff vs.
+  the previous snapshot of the same period (added/removed/changed for
+  highlights, alerts and decisions, plus a summary delta). Returns
+  `{ first: true, … }` when no prior snapshot exists.
 - `GET /api/v1/health-profile` — personal health profile.
 - `GET /api/v1/health-goals` — goal registry.
 - `GET /api/v1/milestones` — persisted health milestones.
