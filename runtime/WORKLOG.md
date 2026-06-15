@@ -66,5 +66,5 @@ Date: 2026-06-09
 
 - Real Apple Health export verification (external: phone export; tooling ready).
 - Real lab report format validation (external: sample reports; parser ready).
-- `platform.latestMap` precedence adoption; FEATURE_AUDIT re-classification.
+- FEATURE_AUDIT re-classification.
 - Optional: re-add a manual quick-log UI if desired (design omitted it).

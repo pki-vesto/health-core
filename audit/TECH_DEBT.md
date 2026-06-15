@@ -6,7 +6,7 @@ Date: 2026-06-09
 
 1. Intelligence modules are broad and dense. `api/lib/platform.js`, `health-os.js` and `intelligence.js` combine route-facing models, scoring, trend math and domain policy. Split only when tests exist around current behavior.
 2. Later domains are data-light. The API and UI surfaces exist, but live observations cover only weight, session volume and nutrition macros.
-3. Source precedence is now encoded (ADR-008: `SOURCE_PRECEDENCE`/`preferLatest` in `query.js`, applied to `latestPerMetric`, `intelligence.latestByMetric`, `health-os.latestFor`). REMAINING: `platform.latestMap` (mood/nutrition latest pickers) is still recency-only — fine while those metrics are single-source manual entries, but should adopt the policy for consistency.
+3. Source precedence is now encoded and applied across latest pickers (ADR-008: `SOURCE_PRECEDENCE`/`preferLatest` in `query.js`, applied to `latestPerMetric`, `intelligence.latestByMetric`, `health-os.latestFor` and `platform.latestMap`).
 4. Lab support: dedicated parser + review/commit now exist (`api/lib/lab.js`, `/api/v1/lab/*`, UI Lab tab). Remaining: validate against real lab report formats.
 5. UI tests are absent. The browser app is central to product value but currently covered only by smoke HTML checks.
 
@@ -28,4 +28,4 @@ Date: 2026-06-09
 
 ## Priority
 
-Fix test depth, real data coverage, source precedence and lab workflow before large feature expansion.
+Fix test depth, real data coverage and lab workflow before large feature expansion.
