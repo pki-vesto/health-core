@@ -200,7 +200,8 @@ for (const [path, check] of [
   ['/api/v1/risks', b => b?.range && Array.isArray(b?.indicators)],
   ['/api/v1/insights', b => Array.isArray(b?.insights)],
   ['/api/v1/insights/timeline', b => Array.isArray(b?.generated) && Array.isArray(b?.history)],
-  ['/api/v1/insights/history', b => Array.isArray(b?.history)]
+  ['/api/v1/insights/history', b => Array.isArray(b?.history)],
+  ['/api/v1/milestones', b => Array.isArray(b?.milestones)]
 ]) {
   const { status, body } = await get(path);
   ok(`GET ${path} → 200`, status === 200, `got ${status}`);

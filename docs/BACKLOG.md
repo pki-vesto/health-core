@@ -4135,11 +4135,11 @@ This is the central machine-readable backlog. The JSON block is the source of tr
       86
     ],
     "acceptance_criteria": [
-      "Code evidence exists: health_milestones + GET /api/v1/longitudinal",
+      "Code evidence exists: api/lib/milestones.js + scripts/detect-milestones.mjs + GET/POST /api/v1/milestones + UI trends milestones",
       "Behavior is reachable through API, UI, migration or ingest path as applicable.",
       "Tests or audit evidence cover the contract before future status upgrades."
     ],
-    "evidence": "health_milestones + GET /api/v1/longitudinal"
+    "evidence": "api/lib/milestones.js + scripts/detect-milestones.mjs + GET/POST /api/v1/milestones + UI trends milestones"
   },
   {
     "number": 207,

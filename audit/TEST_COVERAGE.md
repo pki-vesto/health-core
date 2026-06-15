@@ -23,6 +23,7 @@ Suites (all green):
 - `precedence.test.mjs` — source precedence (ADR-008) + LWW interaction.
 - `decision-support.test.mjs` — informational/non-clinical wording invariants.
 - `track.test.mjs` — tracking correction semantics (stable id + LWW).
+- `milestones.test.mjs` — record, biomarker-range and logging-streak milestone detection plus idempotent writes.
 
 Also: `api/test/ingest.mjs` (temp-DB ingest integration) and `api/test/fixtures.mjs`
 (+ `seed-domains.mjs`) shared harness/fixtures.

@@ -521,7 +521,7 @@ const TREND_KEYS = ['hrv', 'rhr', 'readiness', 'sleep', 'weight', 'volume'];
 const RANGES = [['30', 'Maand'], ['90', 'Kwartaal'], ['120', 'Jaar']];
 SCREENS.trends = async () => {
   const sel = state.metric && METRICS[state.metric] ? state.metric : 'hrv';
-  const [models, corr] = await Promise.all([getMetrics(TREND_KEYS), safe('/correlations?days=90')]);
+  const [models, corr, longitudinal] = await Promise.all([getMetrics(TREND_KEYS), safe('/correlations?days=90'), safe('/longitudinal')]);
   const m = models[sel] || models.hrv;
   const days = +(RANGES.find((r) => r[0] === state.trendsRange) || RANGES[1])[0];
   const data = m.series.slice(-days), dates = m.dates.slice(-days);
@@ -529,6 +529,7 @@ SCREENS.trends = async () => {
   const fmtV = (v) => m.time ? hm(v) : fmtNum(v, m.dp || 0);
   const stats = data.length ? [['Gemiddeld', fmtV(mean(data))], ['Hoogste', fmtV(Math.max(...data))], ['Laagste', fmtV(Math.min(...data))], ['Baseline', m.time ? hm(m.baseline) : fmtNum(m.baseline, m.dp || 0)]] : [];
   const correlations = (corr && corr.correlations || []).slice(0, 3);
+  const milestones = (longitudinal && longitudinal.milestones || []).slice(0, 5);
   return `<div class="page wide stagger">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap">
       <p class="muted" style="margin:0;font-size:13.5px;max-width:520px;line-height:1.5">Langetermijnpatronen wegen zwaarder dan losse dagen. Vergelijk altijd met je eigen baseline, niet met gemiddelden.</p>
@@ -548,6 +549,8 @@ SCREENS.trends = async () => {
     </div>
     ${sectionTitle('Verbanden in deze periode')}
     <div class="cols-3">${correlations.length ? correlations.map(correlationCard).join('') : `<div class="empty">Nog te weinig data voor verbanden</div>`}</div>
+    ${sectionTitle('Mijlpalen')}
+    <div class="card flush">${milestones.length ? `<table class="tbl"><thead><tr><th>Datum</th><th>Mijlpaal</th><th>Waarde</th></tr></thead><tbody>${milestones.map((x) => `<tr><td class="mono" style="color:var(--ink-3)">${esc(x.timestamp)}</td><td style="font-weight:600">${esc(x.title)}<div class="meta" style="font-size:11.5px">${esc(x.detail || '')}</div></td><td class="mono">${x.value == null ? '—' : fmtNum(x.value, 2).replace(/,00$/, '')}</td></tr>`).join('')}</tbody></table>` : `<div class="empty" style="border:none">Nog geen mijlpalen vastgelegd</div>`}</div>
   </div>`;
 };
 

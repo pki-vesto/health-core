@@ -15,6 +15,7 @@ import { v1 } from './routes/v1.js';
 import { ingest } from './routes/ingest.js';
 import { manage } from './routes/manage.js';
 import { lab } from './routes/lab.js';
+import { milestones } from './routes/milestones.js';
 
 const PORT = parseInt(process.env.PORT || '8090', 10);
 const TOKEN = process.env.CORE_BEARER_TOKEN || '';
@@ -81,6 +82,7 @@ app.use('/api/v1', v1);
 app.use('/api/v1', ingest);   // POST /ingest, /ingest/apple-health, /ingest/:id/replay; GET log/quarantine
 app.use('/api/v1', manage);   // POST /sources, /metrics; PATCH /metrics/:key
 app.use('/api/v1', lab);      // POST /lab/parse, /lab/commit; GET /lab/results
+app.use('/api/v1', milestones); // GET /milestones; POST /milestones/detect
 
 // 404 + error handler.
 app.use((req, res) => res.status(404).json({ error: 'not found', path: req.originalUrl }));
