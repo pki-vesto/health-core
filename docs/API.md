@@ -199,10 +199,18 @@ All errors: `{ "error":"message" }`.
 cd ~/health-core
 docker compose build core-api && docker compose up -d            # deploy
 docker logs --tail 20 health-core-api                            # structured JSON request logs (goal 6)
+NODE_MODULES_BASE=$PWD/api/node_modules/noop.js node scripts/check.mjs
+BASE=http://localhost:8091 NODE_MODULES_BASE=$PWD/api/node_modules/noop.js node scripts/check.mjs
 BASE=http://localhost:8091 node api/test/smoke.mjs               # read contract tests (28)
 docker run --rm -v $PWD:/hc -e NODE_MODULES_BASE=/app/node_modules/ \
   -w /hc/api health-core-api:latest node test/ingest.mjs         # ingest logic tests (17, temp DB)
 ```
+
+`scripts/check.mjs` is the single pre-deploy gate. Offline it runs unit tests,
+governance, and schema drift checks. With `BASE=...` it also runs read-only
+smoke. Playwright e2e is opt-in with `RUN_E2E=1` or `--e2e`; because the e2e
+suite can write through the Track workflow, also set `E2E_MUTATING_OK=1` only
+when `BASE` points at a disposable Core DB.
 
 Migrations (goal 13) — additive-only, checksum-tracked:
 ```bash

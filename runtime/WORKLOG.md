@@ -60,6 +60,8 @@ Date: 2026-06-09
 - Manual "Track" screen restored: the UI can write daily manual observations
   through the generic ingest path with stable correction semantics. Biomarker
   entry remains the Lab tab.
+- Single pre-deploy gate added at `scripts/check.mjs`: offline unit,
+  governance and schema checks always run; smoke/e2e are conditional.
 - Verified: Playwright e2e rewritten to the new DOM (7 tests) — green vs demo AND
   live; smoke 91/91; unit 10 suites green. Deployed live (:8091).
 
