@@ -307,7 +307,8 @@ function fatigueScore(db, range) {
   const b = baselines(db, range);
   const hrv = b.baselines.find(x => x.metric === 'heart.hrv_sdnn');
   const sleep = b.baselines.find(x => x.metric === 'sleep.duration');
-  const rhr = b.baselines.find(x => x.metric === 'heart.resting_rate');
+  // Keep RHR local to fatigue scoring so /baselines output remains stable.
+  const rhr = baseline(db, 'heart.resting_rate', range);
   let score = 20;
   if (hrv?.z < -1) score += 25;
   if (sleep?.z < -1) score += 25;

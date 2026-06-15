@@ -2,18 +2,15 @@
 // composition, sleep, nutrition, recovery (fatigue), training, baselines, risk
 // and insight logic. Windows pinned via `to`.
 //
-// NOTE (behaviour locked, not fixed): fatigueScore reads a 'heart.resting_rate'
-// baseline, but BASELINE_METRICS does not include it, so that +20 branch is
-// dead — fatigue maxes at 70 (base 20 + hrv 25 + sleep 25). Consequently
-// recovery warning severity never reaches 'high' and trainingIntelligence
-// overtraining (fatigue>=80) never fires. These tests lock that current
-// behaviour; the dead branch is recorded in audit/TECH_DEBT.md for #18.
+// Fatigue uses HRV + sleep + a local resting-heart-rate baseline. RHR is scoped
+// to fatigue scoring so the public /baselines metric set stays stable.
 import { fileURLToPath } from 'node:url';
 import { buildDb, closeDb, insertObs, seedDaily, harness } from './fixtures.mjs';
 import {
   moodDashboard, bodyCompositionDashboard, sleepAdvanced, nutritionIntelligence,
   recoveryIntelligence, trainingIntelligence, baselines, risks, insights
 } from '../lib/platform.js';
+import { latestMap } from '../lib/series.js';
 
 const TO = '2026-03-01';
 
@@ -30,6 +27,15 @@ export function run() {
     t.eq('mood score = mean of latest', m.score, 60); // mean(60,70,50)
     const vp = m.patterns.find(p => p.metric === 'mood.valence');
     t.eq('mood valence pattern', vp, { metric: 'mood.valence', direction: 'up', delta: 10, confidence: 'low' });
+    closeDb(db);
+  }
+  {
+    const db = buildDb();
+    insertObs(db, { metric: 'mood.valence', date: '2026-02-25', value: 90, source: 'manual', externalId: 'manual:mood.valence:2026-02-25' });
+    insertObs(db, { metric: 'mood.valence', date: '2026-02-25', value: 20, source: 'apple_health', externalId: 'apple:mood.valence:2026-02-25' });
+    insertObs(db, { metric: 'mood.valence', date: '2026-02-24', value: 100, source: 'manual', externalId: 'manual:mood.valence:2026-02-24' });
+    const latest = latestMap(db, ['mood.valence'], { from: '2026-02-01', to: TO }).get('mood.valence');
+    t.eq('latestMap source precedence beats same-day write order', { value: latest.value, source: latest.source }, { value: 90, source: 'manual' });
     closeDb(db);
   }
 
@@ -95,6 +101,24 @@ export function run() {
     t.eq('medium fatigue warning', r.warnings, [{ type: 'accumulating_fatigue', severity: 'medium', score: 70 }]);
     closeDb(db);
   }
+  // ── recovery/training: elevated RHR makes high fatigue paths reachable ──────
+  {
+    const db = buildDb();
+    seedDaily(db, 'heart.hrv_sdnn', '2026-02-15', [60, 60, 60, 40]);      // low HRV → +25
+    seedDaily(db, 'sleep.duration', '2026-02-15', [8, 8, 8, 6]);          // short sleep → +25
+    seedDaily(db, 'heart.resting_rate', '2026-02-15', [58, 58, 58, 74]);  // elevated RHR → +20
+    seedDaily(db, 'fitness.session_volume', '2026-02-15', [1200, 1300, 1400, 1500]);
+
+    const r = recoveryIntelligence(db, { to: TO, days: 90 });
+    t.eq('fatigue includes elevated resting HR', r.fatigue, 90);
+    t.eq('high fatigue warning reachable', r.warnings, [{ type: 'accumulating_fatigue', severity: 'high', score: 90 }]);
+
+    const tr = trainingIntelligence(db, { to: TO, days: 120 });
+    t.eq('overtraining reachable with elevated RHR fatigue', tr.overtraining, true);
+    t.eq('adaptation limited by recovery', tr.adaptation, 'limited_by_recovery');
+    t.eq('recovery-first recommendation', tr.recommendations, ['Prioritize recovery before adding load.']);
+    closeDb(db);
+  }
 
   // ── trainingIntelligence: positive adaptation, no plateau/regression ───────
   {
@@ -102,7 +126,7 @@ export function run() {
     seedDaily(db, 'fitness.session_volume', '2026-02-20', [1000, 1500, 2000]); // rising
     const tr = trainingIntelligence(db, { to: TO, days: 120 });
     t.eq('adaptation positive', tr.adaptation, 'positive');
-    t.eq('no overtraining (dead rhr branch)', tr.overtraining, false);
+    t.eq('no overtraining without fatigue signals', tr.overtraining, false);
     t.eq('not underloaded', tr.underload, false);
     t.eq('no plateau', tr.plateaus, []);
     t.eq('no regression', tr.regression, []);

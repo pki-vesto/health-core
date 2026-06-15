@@ -36,8 +36,9 @@ Date: 2026-06-09
 - `schema.sql` is now generated + drift-checked; governance consistency check added.
 - Playwright UI suite (`e2e/`, 17 tests) incl. reports view extended with
   quarterly/yearly briefings.
-- Found + recorded (not yet fixed) a dead `heart.resting_rate` branch in
-  `platform.js fatigueScore` (see audit/TECH_DEBT.md).
+- Fixed the dead `heart.resting_rate` branch in `platform.js fatigueScore` by
+  computing RHR locally for fatigue scoring; high recovery warnings and
+  overtraining are now reachable in `api/test/platform.test.mjs`.
 
 ## 2026-06-09 — UI redesign ("Personal Health OS", Claude Design handoff)
 
@@ -56,9 +57,9 @@ Date: 2026-06-09
   registry/integrity), Instellingen.
 - SVG chart primitives (sparkline/line/bar/ring/stackbar/scatter), hash routing,
   graceful empty states for sparse data.
-- NOTE: the design has no manual "Track" screen, so the old quick-log form was
-  dropped from the UI; the manual-ingest API + correction semantics (#13) remain
-  and stay unit-tested (`test/track.test.mjs`). Biomarker entry is the Lab tab.
+- Manual "Track" screen restored: the UI can write daily manual observations
+  through the generic ingest path with stable correction semantics. Biomarker
+  entry remains the Lab tab.
 - Single pre-deploy gate added at `scripts/check.mjs`: offline unit,
   governance and schema checks always run; smoke/e2e are conditional.
 - Verified: Playwright e2e rewritten to the new DOM (7 tests) — green vs demo AND
@@ -68,5 +69,5 @@ Date: 2026-06-09
 
 - Real Apple Health export verification (external: phone export; tooling ready).
 - Real lab report format validation (external: sample reports; parser ready).
-- `platform.latestMap` precedence adoption; FEATURE_AUDIT re-classification.
-- Optional: re-add a manual quick-log UI if desired (design omitted it).
+- FEATURE_AUDIT re-classification.
+- Manual quick-log UI restored; continue hardening with real usage data.

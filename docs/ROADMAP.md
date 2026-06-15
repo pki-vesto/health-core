@@ -8,7 +8,7 @@ Status values: completed, in progress, planned. This roadmap uses code/runtime e
 
 - Registered goals: 250.
 - Registry status: 250 completed.
-- Audit correction: many later goals are contract/schema/API complete but still need real data, deeper tests or fuller UI workflows before they should be treated as mature product capability.
+- Audit correction: many later goals are contract/schema/API complete but still need real data, deeper tests or fuller UI workflows before they should be treated as mature product capability. Core DB backup and observations export now cover the durable-memory portability gap. Manual quick-log is now present in the UI and uses the existing generic ingest/correction contract.
 
 ## Domains
 
