@@ -17,6 +17,11 @@ const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', '
 const MONTHS_L = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
 const DAYS_L = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
 const fmtShort = (s) => { const d = new Date(s + 'T00:00:00'); return d.getDate() + ' ' + MONTHS[d.getMonth()]; };
+function amsterdamDate() {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+}
 function fmtToday() { const d = state.serverDate ? new Date(state.serverDate + 'T00:00:00') : new Date(); return `${DAYS_L[d.getDay()]} ${d.getDate()} ${MONTHS_L[d.getMonth()]}`; }
 const greeting = () => { const h = new Date().getHours(); return h < 6 ? 'Goedenacht' : h < 12 ? 'Goedemorgen' : h < 18 ? 'Goedemiddag' : 'Goedenavond'; };
 
@@ -305,6 +310,9 @@ const state = {
   metric: null,
   trendsRange: '90',
   insightsFilter: 'all',
+  trackMetric: localStorage.getItem('hc-track-metric') || 'body.weight',
+  trackDate: amsterdamDate(),
+  trackResult: null,
   expTab: 'running',
   healthTab: 'overzicht',
   theme: localStorage.getItem('hc-theme') || 'light',
@@ -320,6 +328,7 @@ const state = {
 const NAV = [
   { group: 'Dagelijks', items: [
     { id: 'today', label: 'Vandaag', icon: 'today' },
+    { id: 'track', label: 'Loggen', icon: 'plus' },
     { id: 'insights', label: 'Inzichten', icon: 'insights', count: () => state.counts.insights },
     { id: 'trends', label: 'Trends', icon: 'trends' },
   ] },
@@ -338,7 +347,7 @@ const NAV = [
 ];
 const ALL_ITEMS = NAV.flatMap((g) => g.items);
 const TITLES = Object.fromEntries(ALL_ITEMS.map((i) => [i.id, i.label]));
-const BOTTOM = ['today', 'insights', 'trends', 'recovery'];
+const BOTTOM = ['today', 'track', 'insights', 'recovery'];
 const FONT_STACKS = {
   'Hanken Grotesk': '"Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
   'Figtree': '"Figtree", -apple-system, system-ui, sans-serif',
@@ -427,6 +436,54 @@ SCREENS.today = async () => {
         <div class="card" style="display:flex;align-items:center;gap:12px">
           <span class="insight-ic good">${icon('flame', 15)}</span>
           <div style="min-width:0"><div style="font-size:13.5px;font-weight:650">${home && home.profile && home.profile.latest ? home.profile.latest.length : (m.hrv.series.length || 0)} actieve signalen</div><div class="meta" style="font-size:11.5px">Lokaal verwerkt · privacy-first</div></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+};
+
+SCREENS.track = async () => {
+  const [catalog, latest] = await Promise.all([safe('/metrics'), safe('/observations/latest')]);
+  const metrics = ((catalog && catalog.metrics) || []).filter((m) => m.status === 'active');
+  if (!metrics.find((m) => m.key === state.trackMetric) && metrics[0]) state.trackMetric = metrics[0].key;
+  const selected = metrics.find((m) => m.key === state.trackMetric) || metrics[0] || {};
+  const latestRows = ((latest && latest.latest) || []).filter((r) => r.source === 'manual').slice(0, 8);
+  const result = state.trackResult;
+  return `<div class="page wide stagger">
+    <div class="card raised anim" style="margin-bottom:20px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+      <span class="insight-ic good" style="width:38px;height:38px">${icon('plus', 18)}</span>
+      <div style="flex:1;min-width:240px"><div class="eyebrow" style="margin-bottom:5px">Dagelijkse invoer</div>
+        <p class="briefing" style="margin:0;font-size:15px">Log één observatie met de bestaande handmatige ingest. De sleutel is stabiel per metric en dag, dus opnieuw opslaan corrigeert dezelfde rij in plaats van een duplicaat te maken.</p>
+      </div>
+    </div>
+    <div class="split">
+      <div class="card">
+        <div class="card-head" style="margin-bottom:14px"><div><div class="ttl">Nieuwe observatie</div><div class="sub">Bron: manual · correcties via LWW</div></div></div>
+        <div class="cols-2" style="margin-bottom:12px">
+          <label class="field">Metric<select id="track-metric">${metrics.map((m) => `<option value="${esc(m.key)}" data-unit="${esc(m.unit || '')}" ${m.key === state.trackMetric ? 'selected' : ''}>${esc(m.display_name || humanMetric(m.key))} · ${esc(m.key)}</option>`).join('')}</select></label>
+          <label class="field">Datum<input id="track-date" type="date" value="${esc(state.trackDate)}" /></label>
+        </div>
+        <div class="cols-2" style="margin-bottom:12px">
+          <label class="field">Waarde<input id="track-value" type="number" step="any" inputmode="decimal" placeholder="0" /></label>
+          <label class="field">Eenheid<input id="track-unit" value="${esc(selected.unit || '')}" readonly /></label>
+        </div>
+        <label class="field" style="margin-bottom:12px">Notitie optioneel<input id="track-note" placeholder="context, klacht, training, maaltijd…" /></label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn primary" data-track-submit>${icon('check', 14)}Opslaan</button>
+          <span id="track-msg" class="muted" style="font-size:12.5px">${result ? esc(result.message) : ''}</span>
+        </div>
+        ${result ? `<div class="card" style="margin-top:14px;background:var(--surface-2)"><div style="display:flex;gap:10px;align-items:flex-start"><span class="insight-ic ${result.ok ? 'good' : 'warn'}">${icon(result.ok ? 'check' : 'alert', 14)}</span><div><div style="font-size:13.5px;font-weight:700">${esc(result.title)}</div><div class="meta" style="margin-top:4px">${esc(result.detail)}</div></div></div></div>` : ''}
+      </div>
+      <div class="grid" style="gap:16px;align-content:start">
+        <div class="card">
+          <div class="card-head" style="margin-bottom:12px"><div><div class="ttl">Geselecteerd</div><div class="sub mono">${esc(selected.key || '')}</div></div><span class="pill good right">${esc(selected.status || 'active')}</span></div>
+          <p class="meta" style="font-size:13px;line-height:1.5;margin:0">${esc(selected.description || 'Geen beschrijving in de registry.')}</p>
+          <div class="divider" style="margin:14px 0"></div>
+          <div class="cols-2"><div class="kpi"><span class="lab">Eenheid</span><span class="val metric-val">${esc(selected.unit || '—')}</span></div><div class="kpi"><span class="lab">Type</span><span class="val metric-val">${esc(selected.value_kind || 'numeric')}</span></div></div>
+        </div>
+        <div class="card flush">
+          <div style="padding:14px 14px 8px"><div class="ttl">Laatste manual waarden</div></div>
+          ${latestRows.length ? `<table class="tbl"><thead><tr><th>Metric</th><th>Datum</th><th>Waarde</th></tr></thead><tbody>${latestRows.map((r) => `<tr><td style="font-weight:600">${esc(humanMetric(r.metric_type))}<div class="meta mono" style="font-size:11px">${esc(r.metric_type)}</div></td><td class="mono">${esc(r.timestamp)}</td><td class="mono">${fmtNum(r.value, 2).replace(/,00$/, '')} ${esc(r.unit || '')}</td></tr>`).join('')}</tbody></table>` : `<div class="empty" style="border:none">Nog geen handmatige observaties</div>`}
         </div>
       </div>
     </div>
@@ -907,9 +964,81 @@ async function labReviewAction(id, status) {
   }
 }
 
+async function trackMetricChanged() {
+  const sel = document.getElementById('track-metric');
+  const unit = document.getElementById('track-unit');
+  if (!sel || !unit) return;
+  state.trackMetric = sel.value;
+  localStorage.setItem('hc-track-metric', state.trackMetric);
+  unit.value = sel.selectedOptions[0]?.dataset.unit || '';
+}
+async function trackSubmit() {
+  const metric = document.getElementById('track-metric')?.value || '';
+  const date = document.getElementById('track-date')?.value || amsterdamDate();
+  const valueRaw = document.getElementById('track-value')?.value;
+  const unit = document.getElementById('track-unit')?.value || '';
+  const note = document.getElementById('track-note')?.value || '';
+  const msg = document.getElementById('track-msg');
+  const value = Number(valueRaw);
+  state.trackMetric = metric;
+  state.trackDate = date;
+  localStorage.setItem('hc-track-metric', metric);
+
+  if (!metric || !date || !Number.isFinite(value)) {
+    if (msg) msg.textContent = 'Vul metric, datum en een numerieke waarde in.';
+    return;
+  }
+
+  try {
+    const existing = await getJSON(`/observations?metric=${encodeURIComponent(metric)}&from=${encodeURIComponent(date)}&to=${encodeURIComponent(date)}&source=manual&limit=5`, { fresh: true });
+    const row = existing && existing.rows && existing.rows[0];
+    if (row && !window.confirm(`Er bestaat al een handmatige waarde voor ${humanMetric(metric)} op ${date}: ${fmtNum(row.value, 2).replace(/,00$/, '')} ${row.unit || ''}. Overschrijven?`)) {
+      if (msg) msg.textContent = 'Correctie geannuleerd.';
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const externalId = row?.external_id || `ui:${metric}:${date}`;
+    const out = await postJSON('/ingest', {
+      source: 'manual',
+      records: [{
+        metric_type: metric,
+        value,
+        unit,
+        timestamp: date,
+        external_id: externalId,
+        source_updated_at: now,
+        metadata: { note, ui: 'track' }
+      }]
+    });
+    invalidateAfterTrack(metric);
+    state.trackResult = {
+      ok: out.records_written > 0 && out.records_quarantined === 0,
+      title: out.records_quarantined ? 'Invoer in quarantaine' : row ? 'Waarde gecorrigeerd' : 'Waarde opgeslagen',
+      message: `Ingest #${out.ingest_id}: ${out.records_written} geschreven, ${out.records_quarantined} quarantaine`,
+      detail: `${humanMetric(metric)} · ${fmtNum(value, 2).replace(/,00$/, '')} ${unit || ''} · ${date}`
+    };
+    renderScreen();
+  } catch (e) {
+    state.trackResult = { ok: false, title: 'Opslaan mislukt', message: 'Opslaan mislukt: ' + e.message, detail: e.message };
+    renderScreen();
+  }
+}
+function invalidateAfterTrack(metric) {
+  cache.delete('/observations/latest');
+  cache.delete('/platform/home');
+  cache.delete('/insights');
+  cache.delete('/risks');
+  cache.delete('/dashboard');
+  cache.delete('/product/status');
+  cache.delete('/track/schema');
+  cache.delete(`/series/${metric}?bucket=day`);
+  metricCache.clear();
+}
+
 // ============================================================ EVENT DELEGATION
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-nav],[data-theme-toggle],[data-open-insight],[data-insights-filter],[data-trends-range],[data-trends-metric],[data-exp-tab],[data-health-tab],[data-more],[data-close-sheet],[data-open-report],[data-set-theme],[data-set-accent],[data-set-density],[data-set-font],[data-lab-parse],[data-lab-commit],[data-lab-review-id]');
+  const t = e.target.closest('[data-nav],[data-theme-toggle],[data-open-insight],[data-insights-filter],[data-trends-range],[data-trends-metric],[data-exp-tab],[data-health-tab],[data-more],[data-close-sheet],[data-open-report],[data-set-theme],[data-set-accent],[data-set-density],[data-set-font],[data-lab-parse],[data-lab-commit],[data-lab-review-id],[data-track-submit]');
   if (!t) return;
   if (t.dataset.nav != null) return nav(t.dataset.nav, { metric: t.dataset.metric });
   if (t.dataset.themeToggle != null) return setTheme(state.theme === 'dark' ? 'light' : 'dark');
@@ -929,8 +1058,10 @@ document.addEventListener('click', (e) => {
   if (t.dataset.labParse != null) return labParse();
   if (t.dataset.labCommit != null) return labCommit();
   if (t.dataset.labReviewId != null) return labReviewAction(t.dataset.labReviewId, t.dataset.labReviewStatus);
+  if (t.dataset.trackSubmit != null) return trackSubmit();
 });
 document.addEventListener('focusin', (e) => { if (e.target && e.target.id === 'lab-biomarker') labLoadBiomarkers(); });
+document.addEventListener('change', (e) => { if (e.target && e.target.id === 'track-metric') trackMetricChanged(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
 
 // ============================================================ INIT
