@@ -12,7 +12,10 @@ export const v1 = Router();
 // Wrap a handler so q.BadRequest → 400 and anything else → 500 (via app handler).
 const h = (fn) => (req, res, next) => {
   try { fn(req, res); }
-  catch (e) { if (e instanceof q.BadRequest) res.status(400).json({ error: e.message }); else next(e); }
+  catch (e) {
+    if (e instanceof q.BadRequest || e instanceof q.PayloadTooLarge) res.status(e.status).json({ error: e.message });
+    else next(e);
+  }
 };
 
 // Catalog
@@ -29,6 +32,16 @@ v1.get('/observations', h((req, res) => {
 }));
 v1.get('/observations/latest', h((req, res) => {
   res.json({ latest: q.latestPerMetric(db(), req.query) });
+}));
+v1.get('/export/observations', h((req, res) => {
+  res.type('application/x-ndjson');
+  for (const row of q.exportObservations(db(), req.query)) {
+    res.write(JSON.stringify(q.exportRow(row)) + '\n');
+  }
+  res.end();
+}));
+v1.get('/export/observations.json', h((req, res) => {
+  res.json(q.exportObservationsJson(db(), req.query));
 }));
 
 // Time series for charts

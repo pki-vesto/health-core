@@ -20,6 +20,10 @@ async function getText(path) {
   const r = await fetch(BASE + path);
   return { status: r.status, text: await r.text() };
 }
+async function getRaw(path) {
+  const r = await fetch(BASE + path, { headers });
+  return { status: r.status, text: await r.text(), contentType: r.headers.get('content-type') || '' };
+}
 
 console.log(`Core API smoke tests → ${BASE}`);
 
@@ -66,6 +70,17 @@ console.log(`Core API smoke tests → ${BASE}`);
 {
   const { status } = await get('/api/v1/observations?from=2026/01/01');
   ok('bad date → 400', status === 400, `got ${status}`);
+}
+{
+  const { status, text, contentType } = await getRaw('/api/v1/export/observations?from=1900-01-01&to=1900-01-01');
+  ok('GET /api/v1/export/observations → 200', status === 200, `got ${status}`);
+  ok('NDJSON export content type', contentType.includes('application/x-ndjson'), contentType);
+  ok('NDJSON export streams text', typeof text === 'string');
+}
+{
+  const { status, body } = await get('/api/v1/export/observations.json?from=1900-01-01&to=1900-01-01');
+  ok('GET /api/v1/export/observations.json → 200', status === 200, `got ${status}`);
+  ok('JSON export shape', body?.exported_at && Number.isInteger(body?.count) && Array.isArray(body?.observations));
 }
 
 // Latest snapshot

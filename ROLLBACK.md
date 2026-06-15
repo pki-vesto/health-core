@@ -76,6 +76,23 @@ forward (LWW upsert).
 > live" = `imported_by='backfill'` **and** its value still matches a fresh
 > backfill. A full wipe+rebuild makes the whole table backfill-tagged again.
 
+## Level 1b — Restore core.db from a Core backup
+
+If `core.db` itself is damaged and a verified Core backup exists, restore that
+backup instead of rebuilding from source integrations:
+
+```bash
+cd ~/health-core
+docker compose stop core-api
+cp data/core.db data/core.db.broken-$(date -u +%Y%m%dT%H%M%SZ)
+cp snapshots/core.db.backup-<UTC-timestamp> data/core.db
+rm -f data/core.db-wal data/core.db-shm
+docker compose start core-api
+curl http://localhost:8091/api/health
+```
+
+Create backups with `node scripts/backup-core.mjs`; see `docs/BACKUP.md`.
+
 ## Level 2 — Remove the core entirely (back to pre-build state)
 
 ```bash

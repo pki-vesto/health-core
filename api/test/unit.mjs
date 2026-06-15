@@ -16,6 +16,7 @@ import { run as math } from './math.test.mjs';
 import { run as precedence } from './precedence.test.mjs';
 import { run as decisionSupport } from './decision-support.test.mjs';
 import { run as track } from './track.test.mjs';
+import { run as exportBackup } from './export-backup.test.mjs';
 
 const SUITES = [
   ['intelligence', intelligence],
@@ -28,7 +29,8 @@ const SUITES = [
   ['math', math],
   ['precedence', precedence],
   ['decision-support', decisionSupport],
-  ['track', track]
+  ['track', track],
+  ['export-backup', exportBackup]
 ];
 
 let total = 0;
