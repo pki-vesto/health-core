@@ -57,9 +57,9 @@ Date: 2026-06-09
   registry/integrity), Instellingen.
 - SVG chart primitives (sparkline/line/bar/ring/stackbar/scatter), hash routing,
   graceful empty states for sparse data.
-- NOTE: the design has no manual "Track" screen, so the old quick-log form was
-  dropped from the UI; the manual-ingest API + correction semantics (#13) remain
-  and stay unit-tested (`test/track.test.mjs`). Biomarker entry is the Lab tab.
+- Manual "Track" screen restored: the UI can write daily manual observations
+  through the generic ingest path with stable correction semantics. Biomarker
+  entry remains the Lab tab.
 - Verified: Playwright e2e rewritten to the new DOM (7 tests) — green vs demo AND
   live; smoke 91/91; unit 10 suites green. Deployed live (:8091).
 
@@ -68,4 +68,4 @@ Date: 2026-06-09
 - Real Apple Health export verification (external: phone export; tooling ready).
 - Real lab report format validation (external: sample reports; parser ready).
 - `platform.latestMap` precedence adoption; FEATURE_AUDIT re-classification.
-- Optional: re-add a manual quick-log UI if desired (design omitted it).
+- Manual quick-log UI restored; continue hardening with real usage data.
