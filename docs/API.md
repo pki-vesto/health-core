@@ -203,6 +203,32 @@ Body `{ key, display_name, unit, value_kind?, description? }`. **Additive-only**
 Body `{ status?, description? }`. `unit`/`value_kind`/`key` are immutable
 (`409`) — vocabulary is additive-only (invariant 3).
 
+### `POST /api/v1/user-goals` — owner-defined health goal (issue #34)
+Body `{ metric_key, comparator, target_value?, target_low?, target_high?,
+window?, deadline?, status?, label? }`. `metric_key` must exist in
+`metric_types` (otherwise `400 unknown_metric_key`). Comparator vocabulary:
+`lte | gte | eq | range`. For `lte | gte | eq`, `target_value` is required
+and `target_low/target_high` must be absent; for `range`, both `target_low`
+and `target_high` are required with `target_low <= target_high` and
+`target_value` must be absent. `deadline` (optional) is a calendar date
+`YYYY-MM-DD` interpreted in Europe/Amsterdam. Default `status` is `active`.
+→ `201 { goal: {...} }`. This is distinct from the legacy 1-250 development
+registry behind `/api/v1/goals` / `/progress` (table `health_goals`), which
+stays untouched.
+
+### `GET /api/v1/user-goals` — list owner goals
+Optional `?status=active|paused|achieved|retired`. → `{ goals: [...] }`
+ordered most-recent first.
+
+### `GET /api/v1/user-goals/:id` — single goal
+`404` if missing.
+
+### `PATCH /api/v1/user-goals/:id` — edit / pause / retire
+Body is a partial of the create payload (plus `status`). The merged row is
+re-validated so a comparator switch revalidates value fields. There is no
+DELETE — retire/pause is a `status` change. `updated_at` is touched on every
+patch.
+
 ## Errors
 `400` bad request (validation) · `401` unauthorized (when bearer on) ·
 `404` unknown route · `409` integrity failed / additive-only violation ·

@@ -2,7 +2,7 @@
 -- Source of truth: scripts/lib/coredb.mjs (SCHEMA) + migrations/*.sql
 -- Regenerate: node scripts/dump-schema.mjs   |   verify: --check
 -- Runtime-only (created by scripts/migrate.mjs, not a migration): schema_migrations.
--- Tables: 15, Indexes: 10
+-- Tables: 16, Indexes: 12
 
 CREATE TABLE biomarker_reference_ranges (
   id          INTEGER PRIMARY KEY,
@@ -176,4 +176,24 @@ CREATE TABLE symptom_categories (
   label       TEXT NOT NULL,
   description TEXT
 );
+
+CREATE TABLE user_health_goals (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  metric_key   TEXT NOT NULL REFERENCES metric_types(key),
+  comparator   TEXT NOT NULL CHECK (comparator IN ('lte','gte','eq','range')),
+  target_value REAL,
+  target_low   REAL,
+  target_high  REAL,
+  window       TEXT,
+  deadline     TEXT,
+  status       TEXT NOT NULL DEFAULT 'active'
+               CHECK (status IN ('active','paused','achieved','retired')),
+  label        TEXT,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_user_health_goals_metric_key
+  ON user_health_goals(metric_key);
+CREATE INDEX idx_user_health_goals_status
+  ON user_health_goals(status);
 

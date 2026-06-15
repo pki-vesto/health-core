@@ -11,13 +11,17 @@
 // with its own connection — never by relaxing this one.
 import Database from 'better-sqlite3';
 
-const CORE_DB = process.env.CORE_DB || '/core/core.db';
+// Path is resolved on each open (not captured at module load) so test harnesses
+// that swap process.env.CORE_DB between suites are honoured after a singleton
+// reset. In production CORE_DB is set once at process start, so re-reading it
+// per open is a no-op cost.
+function corePath() { return process.env.CORE_DB || '/core/core.db'; }
 
 let _db = null;
 
 export function db() {
   if (_db) return _db;
-  const d = new Database(CORE_DB, { fileMustExist: true });
+  const d = new Database(corePath(), { fileMustExist: true });
   d.pragma('journal_mode = WAL');     // match the writer; harmless if already WAL
   d.pragma('synchronous = NORMAL');
   d.pragma('foreign_keys = ON');
@@ -35,7 +39,7 @@ export function db() {
 let _wdb = null;
 export function writeDb() {
   if (_wdb) return _wdb;
-  const d = new Database(CORE_DB, { fileMustExist: true });
+  const d = new Database(corePath(), { fileMustExist: true });
   d.pragma('journal_mode = WAL');
   d.pragma('synchronous = NORMAL');
   d.pragma('foreign_keys = ON');
@@ -44,4 +48,16 @@ export function writeDb() {
   return _wdb;
 }
 
-export const dbPath = CORE_DB;
+export const dbPath = process.env.CORE_DB || '/core/core.db';
+
+// Test-only: forget the cached read+write connections so the next db()/writeDb()
+// call re-opens against the current process.env.CORE_DB. The unit-test harness
+// boots multiple route suites in a single Node process against fresh temp DBs;
+// without this, the singletons keep pointing at a previous suite's now-unlinked
+// file and writes against this connection silently target the wrong schema.
+// DO NOT call this from production code paths.
+export function __resetForTests() {
+  try { _db?.close(); } catch {}
+  try { _wdb?.close(); } catch {}
+  _db = null; _wdb = null;
+}

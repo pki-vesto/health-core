@@ -31,3 +31,4 @@ Offline suite: `node test/unit.mjs` (10 suites). Live: `test/smoke.mjs`,
 2. Validate the lab parser against real lab report formats; extend analyte aliases/conversions as needed. External dep: representative lab reports.
 3. Re-classify `audit/FEATURE_AUDIT.md` backend-only goals now covered by tests/data tooling, keeping the header summary in sync.
 4. Consume `briefing_snapshots` from the daily-loop epic: a digest endpoint that walks the latest N daily snapshots + a UI "wat is er veranderd" surface that calls `/briefing/:id/diff`. Depends on issue #32 (now done).
+5. Evaluate `user_health_goals` against observations: progress/streaks + due-goal surface in the briefing. The intent layer (`POST/GET/PATCH /api/v1/user-goals`, table + validation + tests) is now landed via issue #34; this is child #4 (progress) and child #5 (digest "due goals") in the Daily Loop epic.
