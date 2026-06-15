@@ -15,7 +15,7 @@ Suites (all green):
 
 - `intelligence.test.mjs` — dashboard/recovery/nutrition/training summaries, scores, anomaly alerts, experiment readiness, platform status.
 - `health-os.test.mjs` — biomarker scorecard/abnormal, sex-specific reference selection, stress scoring branches, briefing shape.
-- `platform.test.mjs` — mood, body-composition, sleep, nutrition, recovery (fatigue), training, baselines, risk, insights. (Locks the dead `fatigueScore` rhr branch — see TECH_DEBT.)
+- `platform.test.mjs` — mood, body-composition, sleep, nutrition, recovery (fatigue), training, baselines, risk, insights, and `platform.latestMap` source precedence. (Locks the dead `fatigueScore` rhr branch — see TECH_DEBT.)
 - `migration.test.mjs` — bootstrap-from-empty: tables, required metrics, sources, 250 goals; migrate.mjs apply/idempotent/status/drift.
 - `apple-health.test.mjs` — alias resolution + sleep-stage parsing + daily aggregation.
 - `lab.test.mjs` — lab analyte mapping, unit conversion, reference status, idempotent commit.
@@ -36,6 +36,9 @@ Also: `api/test/ingest.mjs` (temp-DB ingest integration) and `api/test/fixtures.
 
 ## Governance / schema checks
 
+- `scripts/check.mjs` — single pre-deploy gate. Always runs offline unit,
+  governance and schema drift checks; runs smoke when `BASE` is reachable; runs
+  Playwright only with explicit mutating e2e opt-in.
 - `scripts/governance-check.mjs` — BACKLOG/AUDIT/ROADMAP/NEXT_TASKS ↔ registry ↔ schema consistency.
 - `scripts/dump-schema.mjs --check` — schema.sql drift check.
 
@@ -43,4 +46,3 @@ Also: `api/test/ingest.mjs` (temp-DB ingest integration) and `api/test/fixtures.
 
 - Real-device Apple Health export compatibility (tooling ready; needs a real export).
 - Real lab report format validation (parser ready; needs sample reports).
-- `platform.latestMap` not yet precedence-aware (single-source in practice).

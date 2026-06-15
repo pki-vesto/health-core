@@ -25,6 +25,9 @@ ok('GET /api/v1/metrics without token → 401', await status('/api/v1/metrics') 
 ok('GET /api/v1/metrics with WRONG token → 401', await status('/api/v1/metrics', 'not-the-token') === 401);
 ok('GET /api/v1/metrics with correct token → 200', await status('/api/v1/metrics', TOKEN) === 200);
 ok('GET /api/v1/observations with correct token → 200', await status('/api/v1/observations?limit=1', TOKEN) === 200);
+ok('GET /api/v1/export/observations without token → 401', await status('/api/v1/export/observations') === 401);
+ok('GET /api/v1/export/observations with correct token → 200', await status('/api/v1/export/observations', TOKEN) === 200);
+ok('GET /api/v1/export/observations.json with correct token → 200', await status('/api/v1/export/observations.json', TOKEN) === 200);
 ok('GET /api/v1/dashboard with correct token → 200', await status('/api/v1/dashboard', TOKEN) === 200);
 
 // Write/ingest surface is gated too (it lives under /api/v1).

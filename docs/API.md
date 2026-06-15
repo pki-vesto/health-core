@@ -56,6 +56,28 @@ Invalid `metric` or malformed date → `400`.
 ### `GET /api/v1/observations/latest` — newest point per metric (Today Snapshot)
 `?metrics=body.weight,nutrition.calories` to filter. → `{ "latest":[…] }`
 
+### `GET /api/v1/export/observations` — full observations NDJSON export
+Streams every matching observation as newline-delimited JSON with
+`Content-Type: application/x-ndjson`. Supports the same filters as
+`/observations`: `metric`, `from`, `to`, `source`. This route is intentionally
+not paginated and is intended for local portability/export jobs.
+```json
+{"timestamp":"2026-06-09","metric_type":"nutrition.calories","value":1536.35,
+ "unit":"kcal","source":"shred","external_id":"foods-day:2026-06-09",
+ "source_updated_at":"…","metadata":{…},"updated_at":"…"}
+```
+Invalid `metric` or malformed date → `400`.
+
+### `GET /api/v1/export/observations.json` — bounded JSON export
+Returns a single JSON document for smaller pulls. Supports the same filters as
+the NDJSON route plus `max` (default and maximum: `10000`).
+```json
+{ "exported_at":"2026-06-15T11:00:00.000Z", "count":1,
+  "observations":[{ "timestamp":"2026-06-09", "metric_type":"body.weight",
+    "value":79, "unit":"kg", "source":"manual", "external_id":"…" }] }
+```
+Invalid filters → `400`; a requested JSON export larger than `max` → `413`.
+
 ### `GET /api/v1/series/:metric` — chart-ready series
 `?bucket=day|week|month` (default `day`), `?agg=avg|sum|min|max|count`
 (default `avg`; ignored for `day`), `?from`, `?to`. Week buckets are
@@ -183,10 +205,18 @@ All errors: `{ "error":"message" }`.
 cd ~/health-core
 docker compose build core-api && docker compose up -d            # deploy
 docker logs --tail 20 health-core-api                            # structured JSON request logs (goal 6)
+NODE_MODULES_BASE=$PWD/api/node_modules/noop.js node scripts/check.mjs
+BASE=http://localhost:8091 NODE_MODULES_BASE=$PWD/api/node_modules/noop.js node scripts/check.mjs
 BASE=http://localhost:8091 node api/test/smoke.mjs               # read contract tests (28)
 docker run --rm -v $PWD:/hc -e NODE_MODULES_BASE=/app/node_modules/ \
   -w /hc/api health-core-api:latest node test/ingest.mjs         # ingest logic tests (17, temp DB)
 ```
+
+`scripts/check.mjs` is the single pre-deploy gate. Offline it runs unit tests,
+governance, and schema drift checks. With `BASE=...` it also runs read-only
+smoke. Playwright e2e is opt-in with `RUN_E2E=1` or `--e2e`; because the e2e
+suite can write through the Track workflow, also set `E2E_MUTATING_OK=1` only
+when `BASE` points at a disposable Core DB.
 
 Migrations (goal 13) — additive-only, checksum-tracked:
 ```bash
@@ -194,6 +224,17 @@ docker run --rm -v /home/peter/health-core:/hc -e CORE_DB=/hc/data/core.db \
   -e NODE_MODULES_BASE=/app/node_modules/ health-core-api:latest \
   node /hc/scripts/migrate.mjs [--status|--dry-run]
 ```
+
+Core backup and observation portability:
+```bash
+cd ~/health-core
+NODE_MODULES_BASE=$PWD/api/node_modules/ CORE_DB=$PWD/data/core.db \
+  node scripts/backup-core.mjs
+
+curl -H "Authorization: Bearer $CORE_BEARER_TOKEN" \
+  http://localhost:8091/api/v1/export/observations > observations.ndjson
+```
+See `docs/BACKUP.md` for restore steps.
 
 ## Rollback
 `docker compose down` removes the API with zero effect on the Core or on

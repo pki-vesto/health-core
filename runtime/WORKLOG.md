@@ -62,6 +62,8 @@ Date: 2026-06-09
   entry remains the Lab tab.
 - Health milestones now have an idempotent detector, script/POST entrypoint,
   persisted read route and trends UI list.
+- Single pre-deploy gate added at `scripts/check.mjs`: offline unit,
+  governance and schema checks always run; smoke/e2e are conditional.
 - Verified: Playwright e2e rewritten to the new DOM (7 tests) — green vs demo AND
   live; smoke 91/91; unit 10 suites green. Deployed live (:8091).
 
@@ -69,5 +71,5 @@ Date: 2026-06-09
 
 - Real Apple Health export verification (external: phone export; tooling ready).
 - Real lab report format validation (external: sample reports; parser ready).
-- `platform.latestMap` precedence adoption; FEATURE_AUDIT re-classification.
+- FEATURE_AUDIT re-classification.
 - Manual quick-log and health milestones restored; continue hardening with real usage data.

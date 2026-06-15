@@ -10,6 +10,7 @@ import {
   moodDashboard, bodyCompositionDashboard, sleepAdvanced, nutritionIntelligence,
   recoveryIntelligence, trainingIntelligence, baselines, risks, insights
 } from '../lib/platform.js';
+import { latestMap } from '../lib/series.js';
 
 const TO = '2026-03-01';
 
@@ -26,6 +27,15 @@ export function run() {
     t.eq('mood score = mean of latest', m.score, 60); // mean(60,70,50)
     const vp = m.patterns.find(p => p.metric === 'mood.valence');
     t.eq('mood valence pattern', vp, { metric: 'mood.valence', direction: 'up', delta: 10, confidence: 'low' });
+    closeDb(db);
+  }
+  {
+    const db = buildDb();
+    insertObs(db, { metric: 'mood.valence', date: '2026-02-25', value: 90, source: 'manual', externalId: 'manual:mood.valence:2026-02-25' });
+    insertObs(db, { metric: 'mood.valence', date: '2026-02-25', value: 20, source: 'apple_health', externalId: 'apple:mood.valence:2026-02-25' });
+    insertObs(db, { metric: 'mood.valence', date: '2026-02-24', value: 100, source: 'manual', externalId: 'manual:mood.valence:2026-02-24' });
+    const latest = latestMap(db, ['mood.valence'], { from: '2026-02-01', to: TO }).get('mood.valence');
+    t.eq('latestMap source precedence beats same-day write order', { value: latest.value, source: latest.source }, { value: 90, source: 'manual' });
     closeDb(db);
   }
 

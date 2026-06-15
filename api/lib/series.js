@@ -1,8 +1,9 @@
 // Generic time-series read + stat helpers, extracted from platform.js (task #18)
 // so the platform module keeps only domain-facing models and scoring. Behaviour
 // is identical to the previous in-file helpers — locked by test/platform.test.mjs
-// and the live smoke suite. No domain policy lives here.
-import { BadRequest, isDate } from './query.js';
+// and the live smoke suite. Latest-value selection follows ADR-008 source
+// precedence so platform surfaces match the rest of the read API.
+import { BadRequest, isDate, preferLatest } from './query.js';
 
 // ── range / dates ────────────────────────────────────────────────────────────
 export function rangeParams(db, params, fallbackDays) {
@@ -46,10 +47,11 @@ export function metricTrends(db, metrics, range) {
 
 export function observations(db, metrics, range) {
   return db.prepare(`
-    SELECT timestamp, metric_type, value, unit, metadata
-      FROM observations
-     WHERE timestamp BETWEEN ? AND ? AND metric_type IN (${metrics.map(() => '?').join(',')})
-     ORDER BY timestamp
+    SELECT o.timestamp, o.metric_type, o.value, o.unit, o.metadata,
+           s.name AS source, o.source_updated_at, o.updated_at
+      FROM observations o JOIN sources s ON s.id = o.source
+     WHERE o.timestamp BETWEEN ? AND ? AND o.metric_type IN (${metrics.map(() => '?').join(',')})
+     ORDER BY o.timestamp
   `).all(range.from, range.to, ...metrics);
 }
 
@@ -63,9 +65,13 @@ export function values(db, metric, range) {
 }
 
 export function latestMap(db, metrics, range) {
-  const rows = observations(db, metrics, range).reverse();
   const m = new Map();
-  for (const r of rows) if (!m.has(r.metric_type)) m.set(r.metric_type, r);
+  for (const r of observations(db, metrics, range)) {
+    const prev = m.get(r.metric_type);
+    if (!prev || r.timestamp > prev.timestamp || (r.timestamp === prev.timestamp && preferLatest(r, prev))) {
+      m.set(r.metric_type, r);
+    }
+  }
   return m;
 }
 

@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "NODE_MODULES_BASE=$PWD/node_modules/ node test/unit.mjs",
+    "check": "NODE_MODULES_BASE=$PWD/node_modules/noop.js node ../scripts/check.mjs",
     "test:smoke": "node test/smoke.mjs",
     "test:intel": "NODE_MODULES_BASE=$PWD/node_modules/ node test/intelligence-golden.test.mjs"
   },

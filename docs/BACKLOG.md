@@ -2,9 +2,10 @@
 
 Date: 2026-06-09
 
-Implementation note 2026-06-15: manual quick-log is available through the Track
-UI and posts to the existing generic ingest path with stable same-day correction
-semantics.
+Implementation note 2026-06-15: Core DB backup and observations export are
+available through `scripts/backup-core.mjs` and `/api/v1/export/observations*`.
+Manual quick-log is available through the Track UI and posts to the existing
+generic ingest path with stable same-day correction semantics.
 
 This is the central machine-readable backlog. The JSON block is the source of truth for goals 1-250.
 
