@@ -203,6 +203,21 @@ Body `{ key, display_name, unit, value_kind?, description? }`. **Additive-only**
 Body `{ status?, description? }`. `unit`/`value_kind`/`key` are immutable
 (`409`) — vocabulary is additive-only (invariant 3).
 
+### `POST /api/v1/recommendations/:rec_key/action` — recommendation lifecycle
+Body `{ status, snooze_until?, note? }` with `status ∈ acknowledged | snoozed |
+dismissed | done`. `snooze_until` is required for `snoozed` and must be a
+future ISO8601 timestamp with a timezone offset (Europe/Amsterdam convention);
+forbidden for the other statuses. `note` is capped at 500 chars. → `201
+{ ok, id, rec_key, status, snooze_until, note }`. The active `decision-support`
+surface filters by the latest action per `rec_key`: dismissed/done hide it,
+unexpired snoozes hide it until `snooze_until`. The `rec_key` itself is the
+deterministic `type:metric|subject` identifier emitted by `decision-support`.
+
+### `GET /api/v1/recommendations/actions` — action history
+`?rec_key=` narrows to one key; `?limit=` defaults to 100 (max 500). Returns
+rows DESC by `created_at,id`. → `{ actions:[{ id, rec_key, status,
+snooze_until, note, created_at }] }`.
+
 ## Errors
 `400` bad request (validation) · `401` unauthorized (when bearer on) ·
 `404` unknown route · `409` integrity failed / additive-only violation ·

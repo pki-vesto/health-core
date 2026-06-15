@@ -21,6 +21,7 @@ import { run as exportBackup } from './export-backup.test.mjs';
 import { run as briefingSnapshot } from './briefing-snapshot.test.mjs';
 import { run as briefingDiff } from './briefing-diff.test.mjs';
 import { run as briefingRoutes } from './briefing-routes.test.mjs';
+import { run as recommendationActions } from './recommendation-actions.test.mjs';
 
 const SUITES = [
   ['intelligence', intelligence],
@@ -38,7 +39,8 @@ const SUITES = [
   ['export-backup', exportBackup],
   ['briefing-snapshot', briefingSnapshot],
   ['briefing-diff', briefingDiff],
-  ['briefing-routes', briefingRoutes]
+  ['briefing-routes', briefingRoutes],
+  ['recommendation-actions', recommendationActions]
 ];
 
 let total = 0;

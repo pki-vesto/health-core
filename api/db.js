@@ -11,13 +11,13 @@
 // with its own connection — never by relaxing this one.
 import Database from 'better-sqlite3';
 
-const CORE_DB = process.env.CORE_DB || '/core/core.db';
+function corePath() { return process.env.CORE_DB || '/core/core.db'; }
 
 let _db = null;
 
 export function db() {
   if (_db) return _db;
-  const d = new Database(CORE_DB, { fileMustExist: true });
+  const d = new Database(corePath(), { fileMustExist: true });
   d.pragma('journal_mode = WAL');     // match the writer; harmless if already WAL
   d.pragma('synchronous = NORMAL');
   d.pragma('foreign_keys = ON');
@@ -35,7 +35,7 @@ export function db() {
 let _wdb = null;
 export function writeDb() {
   if (_wdb) return _wdb;
-  const d = new Database(CORE_DB, { fileMustExist: true });
+  const d = new Database(corePath(), { fileMustExist: true });
   d.pragma('journal_mode = WAL');
   d.pragma('synchronous = NORMAL');
   d.pragma('foreign_keys = ON');
@@ -44,4 +44,14 @@ export function writeDb() {
   return _wdb;
 }
 
-export const dbPath = CORE_DB;
+export const dbPath = corePath();
+
+// Test hook: drop cached connections so a follow-up db()/writeDb() reopens
+// against the current CORE_DB. Only used by suites that swap the underlying
+// file between tests (e.g. recommendation-actions after briefing-routes).
+export function __resetForTests() {
+  try { _db?.close(); } catch {}
+  try { _wdb?.close(); } catch {}
+  _db = null;
+  _wdb = null;
+}
