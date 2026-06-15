@@ -59,6 +59,8 @@ Date: 2026-06-09
 - NOTE: the design has no manual "Track" screen, so the old quick-log form was
   dropped from the UI; the manual-ingest API + correction semantics (#13) remain
   and stay unit-tested (`test/track.test.mjs`). Biomarker entry is the Lab tab.
+- Single pre-deploy gate added at `scripts/check.mjs`: offline unit,
+  governance and schema checks always run; smoke/e2e are conditional.
 - Verified: Playwright e2e rewritten to the new DOM (7 tests) — green vs demo AND
   live; smoke 91/91; unit 10 suites green. Deployed live (:8091).
 

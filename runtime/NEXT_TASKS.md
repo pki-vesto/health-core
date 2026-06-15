@@ -30,5 +30,4 @@ Offline suite: `node test/unit.mjs` (10 suites). Live: `test/smoke.mjs`,
 1. Run a real Auto Health Export through `scripts/import-apple-health.mjs` (dry-run → add any unmapped aliases → `--post`); fill the observed-field-names table in `docs/APPLE-HEALTH-IMPORT.md`. External dep: a real phone export.
 2. Validate the lab parser against real lab report formats; extend analyte aliases/conversions as needed. External dep: representative lab reports.
 3. Apply source precedence (ADR-008) to `platform.latestMap` (mood/nutrition latest pickers) for full consistency.
-4. Wire `test/unit.mjs`, `e2e`, `scripts/governance-check.mjs` and `scripts/dump-schema.mjs --check` into a single pre-deploy gate (Definition of Done).
-5. Re-classify `audit/FEATURE_AUDIT.md` backend-only goals now covered by tests/data tooling, keeping the header summary in sync.
+4. Re-classify `audit/FEATURE_AUDIT.md` backend-only goals now covered by tests/data tooling, keeping the header summary in sync.

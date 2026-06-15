@@ -35,6 +35,9 @@ Also: `api/test/ingest.mjs` (temp-DB ingest integration) and `api/test/fixtures.
 
 ## Governance / schema checks
 
+- `scripts/check.mjs` — single pre-deploy gate. Always runs offline unit,
+  governance and schema drift checks; runs smoke when `BASE` is reachable; runs
+  Playwright only with explicit mutating e2e opt-in.
 - `scripts/governance-check.mjs` — BACKLOG/AUDIT/ROADMAP/NEXT_TASKS ↔ registry ↔ schema consistency.
 - `scripts/dump-schema.mjs --check` — schema.sql drift check.
 
