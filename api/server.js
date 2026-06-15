@@ -17,6 +17,7 @@ import { manage } from './routes/manage.js';
 import { lab } from './routes/lab.js';
 import { milestones } from './routes/milestones.js';
 import { briefing } from './routes/briefing.js';
+import { recommendations } from './routes/recommendations.js';
 
 const PORT = parseInt(process.env.PORT || '8090', 10);
 const TOKEN = process.env.CORE_BEARER_TOKEN || '';
@@ -85,6 +86,7 @@ app.use('/api/v1', manage);   // POST /sources, /metrics; PATCH /metrics/:key
 app.use('/api/v1', lab);      // POST /lab/parse, /lab/commit; GET /lab/results
 app.use('/api/v1', milestones); // GET /milestones; POST /milestones/detect
 app.use('/api/v1', briefing); // GET /briefing/history, /briefing/:id, /briefing/:id/diff
+app.use('/api/v1', recommendations); // POST /recommendations/:rec_key/action; GET /recommendations/actions
 
 // 404 + error handler.
 app.use((req, res) => res.status(404).json({ error: 'not found', path: req.originalUrl }));

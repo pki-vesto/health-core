@@ -300,6 +300,60 @@ export function progress(db) {
 export const DECISION_DISCLAIMER =
   'Informational context derived from your own data. It does not replace medical advice or provide a diagnosis — consult a qualified clinician for medical decisions.';
 
+// Deterministic identifier for a recommendation. Built from `type` + a strong
+// subject (metric > subject > a fixed slug) so the SAME logical recommendation
+// gets the SAME rec_key across recomputes — that is the join key the lifecycle
+// layer (recommendation_actions) writes against. Never include timestamps or
+// recompute counters here, otherwise actions would never bind to a future
+// instance of the same recommendation. Subject is normalised to lower-kebab so
+// callers cannot accidentally fork a key by changing casing or whitespace.
+export function recKey({ type, metric, subject } = {}) {
+  const t = String(type || 'unknown').trim().toLowerCase();
+  const raw = metric ?? subject ?? 'general';
+  const s = String(raw).trim().toLowerCase().replace(/\s+/g, '-');
+  return `${t}:${s}`;
+}
+
+// Lifecycle filter: returns the latest action row per rec_key. Used by the
+// read path (decisionSupport) to drop dismissed/done items and snoozed items
+// whose snooze_until has not yet been reached. Resilient to the migration
+// being absent (older DBs) — returns an empty map so the read path degrades
+// gracefully instead of 500-ing.
+export function latestRecommendationActions(db) {
+  try {
+    const rows = db.prepare(
+      `SELECT a.rec_key, a.status, a.snooze_until, a.created_at
+         FROM recommendation_actions a
+         JOIN (
+           SELECT rec_key, MAX(id) AS max_id
+             FROM recommendation_actions
+            GROUP BY rec_key
+         ) latest ON latest.max_id = a.id`
+    ).all();
+    const out = new Map();
+    for (const r of rows) out.set(r.rec_key, r);
+    return out;
+  } catch {
+    return new Map();
+  }
+}
+
+// True iff the LATEST action for a rec_key means it should NOT be surfaced
+// right now. Dismissed/done hide it forever (until a new action is recorded);
+// snoozed hides it until `snooze_until` (Europe/Amsterdam ISO) is reached.
+// `now` defaults to current Amsterdam time so the read path uses the SAME
+// civil clock the snooze was written against.
+export function isRecHiddenByAction(latest, nowIso = amsterdamNowIso()) {
+  if (!latest) return false;
+  if (latest.status === 'dismissed' || latest.status === 'done') return true;
+  if (latest.status === 'snoozed') {
+    const until = latest.snooze_until;
+    if (!until) return false; // malformed → don't hide (don't lose the rec)
+    return String(until) > String(nowIso); // lexicographic ISO compare
+  }
+  return false;
+}
+
 export function decisionSupport(db) {
   const recs = [];
   const abnormal = abnormalBiomarkers(db).abnormal;
@@ -307,6 +361,7 @@ export function decisionSupport(db) {
     const name = displayName(db, a.metric);
     recs.push({
       type: 'biomarker',
+      rec_key: recKey({ type: 'biomarker', metric: a.metric }),
       priority: a.status === 'high' ? 'review' : 'monitor',
       informational: true,
       message: `${name} is ${a.status === 'high' ? 'above' : 'below'} its reference range (latest result).`
@@ -316,12 +371,18 @@ export function decisionSupport(db) {
   if (stress.score != null && stress.score >= 70) {
     recs.push({
       type: 'stress',
+      rec_key: recKey({ type: 'stress', subject: 'overall' }),
       priority: 'review',
       informational: true,
       message: 'Stress signals are elevated relative to your recent recovery (latest window).'
     });
   }
-  return { recommendations: recs, note: DECISION_DISCLAIMER };
+  // Lifecycle filter: drop dismissed/done and unexpired snoozes. Wording and
+  // `informational:true` invariants are preserved on whatever survives.
+  const latest = latestRecommendationActions(db);
+  const nowIso = amsterdamNowIso();
+  const visible = recs.filter(r => !isRecHiddenByAction(latest.get(r.rec_key), nowIso));
+  return { recommendations: visible, note: DECISION_DISCLAIMER };
 }
 
 function displayName(db, key) {
