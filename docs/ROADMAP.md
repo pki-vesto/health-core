@@ -9,6 +9,11 @@ Status values: completed, in progress, planned. This roadmap uses code/runtime e
 - Registered goals: 250.
 - Registry status: 250 completed.
 - Audit correction: many later goals are contract/schema/API complete but still need real data, deeper tests or fuller UI workflows before they should be treated as mature product capability. Core DB backup and observations export now cover the durable-memory portability gap. Manual quick-log is now present in the UI and uses the existing generic ingest/correction contract. Health milestones now have an idempotent detection/write path and UI surface.
+- 2026-06-15 (issue #34): The intent layer is now in place — owner-defined
+  personal health targets live in a new `user_health_goals` table and are
+  managed via `POST/GET/PATCH /api/v1/user-goals`. This unblocks the Daily Loop
+  epic's progress/streaks child and "due goals" digest surface; the legacy
+  `/goals` + `/progress` dev-registry surfaces stay as-is.
 
 ## Domains
 

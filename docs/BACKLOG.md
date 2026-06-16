@@ -7,6 +7,14 @@ available through `scripts/backup-core.mjs` and `/api/v1/export/observations*`.
 Manual quick-log is available through the Track UI and posts to the existing
 generic ingest path with stable same-day correction semantics.
 
+Implementation note 2026-06-15 (issue #34): Owner-defined personal health
+targets land as a NEW, additive table `user_health_goals` with CRUD at
+`POST/GET/PATCH /api/v1/user-goals`. This is the intent layer (declare what
+"good" means for the owner — comparator + threshold/range against an existing
+`metric_types(key)`, with optional deadline). The legacy 1-250 development
+`health_goals` registry and its `GET /api/v1/goals` + `/progress` surfaces are
+deliberately untouched. Retire/pause is a status change; there is no DELETE.
+
 This is the central machine-readable backlog. The JSON block is the source of truth for goals 1-250.
 
 ```json
