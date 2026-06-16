@@ -91,7 +91,7 @@ Date: 2026-06-09
 
 ## 2026-06-15 — User-defined health goals & targets (issue #34)
 
-- Additive migration `009_user_health_goals.sql` adds `user_health_goals`
+- Additive migration `010_user_health_goals.sql` adds `user_health_goals`
   (id/metric_key→metric_types(key)/comparator∈{lte,gte,eq,range}/target_value/
   target_low/target_high/window/deadline/status∈{active,paused,achieved,retired}/
   label/created_at/updated_at) plus two indexes (status, metric_key). Distinct

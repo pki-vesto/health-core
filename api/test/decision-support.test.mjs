@@ -3,7 +3,7 @@
 // diagnoses — and the non-clinical disclaimer travels with every surface.
 import { fileURLToPath } from 'node:url';
 import { buildDb, closeDb, insertObs, harness } from './fixtures.mjs';
-import { decisionSupport, brief, DECISION_DISCLAIMER } from '../lib/health-os.js';
+import { decisionSupport, brief, DECISION_DISCLAIMER, recKey } from '../lib/health-os.js';
 
 // Clinical directives / diagnostic claims that must never appear in a message.
 const FORBIDDEN = /\b(you should|you must|prescrib\w*|diagnos\w*|medication|medicine|dosage|dose|cure[sd]?|treat\b|treatment|take \d)\b/i;
@@ -40,6 +40,26 @@ export function run() {
   // Disclaimer must travel with briefings too (it surfaces decisions there).
   const b = brief(db, 'daily');
   t.eq('briefing carries disclaimer', b.disclaimer, DECISION_DISCLAIMER);
+
+  // ── rec_key lifecycle invariants (issue #33) ─────────────────────────────
+  // Every rec must have a deterministic rec_key and it must be stable across
+  // recomputes — that key is what recommendation_actions joins on.
+  t.ok('every rec carries a rec_key', ds.recommendations.every(r => typeof r.rec_key === 'string' && r.rec_key.length > 0));
+  const expected = new Set(['biomarker:blood.crp', 'biomarker:blood.vitamin_d', 'stress:overall']);
+  t.eq('rec_keys are the deterministic type:subject form',
+    new Set(ds.recommendations.map(r => r.rec_key)), expected);
+
+  const ds2 = decisionSupport(db);
+  t.eq('rec_keys are stable across recomputes',
+    ds2.recommendations.map(r => r.rec_key).sort(),
+    ds.recommendations.map(r => r.rec_key).sort());
+
+  // recKey helper is the single source of truth — write and read paths must
+  // agree byte-for-byte even if input casing/whitespace differs.
+  t.eq('recKey is normalised lowercase',
+    recKey({ type: 'Biomarker', metric: 'Blood.CRP' }), 'biomarker:blood.crp');
+  t.eq('recKey falls back to subject then "general"',
+    recKey({ type: 'stress' }), 'stress:general');
 
   closeDb(db);
   return t.summary();

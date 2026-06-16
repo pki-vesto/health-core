@@ -2,7 +2,7 @@
 -- Source of truth: scripts/lib/coredb.mjs (SCHEMA) + migrations/*.sql
 -- Regenerate: node scripts/dump-schema.mjs   |   verify: --check
 -- Runtime-only (created by scripts/migrate.mjs, not a migration): schema_migrations.
--- Tables: 16, Indexes: 12
+-- Tables: 17, Indexes: 13
 
 CREATE TABLE biomarker_reference_ranges (
   id          INTEGER PRIMARY KEY,
@@ -164,6 +164,17 @@ CREATE TABLE quarantine (
   resolved   INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_quarantine_ingest ON quarantine(ingest_id);
+
+CREATE TABLE recommendation_actions (
+  id           INTEGER PRIMARY KEY,
+  rec_key      TEXT NOT NULL,
+  status       TEXT NOT NULL CHECK (status IN ('acknowledged','snoozed','dismissed','done')),
+  snooze_until TEXT,
+  note         TEXT,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_rec_actions_key_created
+  ON recommendation_actions(rec_key, created_at DESC);
 
 CREATE TABLE sources (
   id    INTEGER PRIMARY KEY,

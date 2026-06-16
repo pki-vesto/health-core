@@ -22,7 +22,7 @@ const require = createRequire(process.env.NODE_MODULES_BASE || '/app/node_module
 const Database = require('better-sqlite3');
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const MIG_PATH = join(HERE, '..', '..', 'migrations', '009_user_health_goals.sql');
+const MIG_PATH = join(HERE, '..', '..', 'migrations', '010_user_health_goals.sql');
 
 async function boot() {
   const tmp = buildDb();

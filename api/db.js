@@ -11,10 +11,6 @@
 // with its own connection — never by relaxing this one.
 import Database from 'better-sqlite3';
 
-// Path is resolved on each open (not captured at module load) so test harnesses
-// that swap process.env.CORE_DB between suites are honoured after a singleton
-// reset. In production CORE_DB is set once at process start, so re-reading it
-// per open is a no-op cost.
 function corePath() { return process.env.CORE_DB || '/core/core.db'; }
 
 let _db = null;
@@ -48,16 +44,14 @@ export function writeDb() {
   return _wdb;
 }
 
-export const dbPath = process.env.CORE_DB || '/core/core.db';
+export const dbPath = corePath();
 
-// Test-only: forget the cached read+write connections so the next db()/writeDb()
-// call re-opens against the current process.env.CORE_DB. The unit-test harness
-// boots multiple route suites in a single Node process against fresh temp DBs;
-// without this, the singletons keep pointing at a previous suite's now-unlinked
-// file and writes against this connection silently target the wrong schema.
-// DO NOT call this from production code paths.
+// Test hook: drop cached connections so a follow-up db()/writeDb() reopens
+// against the current CORE_DB. Only used by suites that swap the underlying
+// file between tests (e.g. recommendation-actions after briefing-routes).
 export function __resetForTests() {
   try { _db?.close(); } catch {}
   try { _wdb?.close(); } catch {}
-  _db = null; _wdb = null;
+  _db = null;
+  _wdb = null;
 }

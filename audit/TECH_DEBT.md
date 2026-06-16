@@ -13,6 +13,7 @@ Date: 2026-06-09
 ## Correctness (found by fixture tests 2026-06-09)
 
 - Fixed in #17: `platform.js fatigueScore` now computes a local `heart.resting_rate` baseline, so elevated RHR can add fatigue without changing the public `/baselines` metric set. `recoveryIntelligence` high-severity warnings and `trainingIntelligence.overtraining` are now reachable and locked by `api/test/platform.test.mjs`.
+- Resolved in #33: `decisionSupport()` recommendations now carry a deterministic `rec_key` and an additive `recommendation_actions` table records acknowledge / snooze / dismiss / done events. The active surface filters by latest-action-per-key (dismissed/done hidden; snoozed hidden until `snooze_until`), with the same Europe/Amsterdam clock the briefing layer uses. Wording invariants (`DECISION_DISCLAIMER`, `informational:true`) preserved.
 
 ## Medium Impact
 
