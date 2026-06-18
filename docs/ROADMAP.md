@@ -8,7 +8,7 @@ Status values: completed, in progress, planned. This roadmap uses code/runtime e
 
 - Registered goals: 250.
 - Registry status: 250 completed.
-- Audit correction: many later goals are contract/schema/API complete but still need real data, deeper tests or fuller UI workflows before they should be treated as mature product capability. Core DB backup and observations export now cover the durable-memory portability gap. Manual quick-log is now present in the UI and uses the existing generic ingest/correction contract. Health milestones now have an idempotent detection/write path and UI surface.
+- Audit correction: many later goals are contract/schema/API complete but still need real data, deeper tests or fuller UI workflows before they should be treated as mature product capability. Core DB backup and observations export now cover the durable-memory portability gap. Manual quick-log is now present in the UI and uses the existing generic ingest/correction contract. Health milestones now have an idempotent detection/write path and UI surface. Fixture coverage now spans all 25 registered domains and every active metric through `seedAllDomains()` plus `domain-fixtures.test.mjs`.
 - 2026-06-15 (issue #34): The intent layer is now in place — owner-defined
   personal health targets live in a new `user_health_goals` table and are
   managed via `POST/GET/PATCH /api/v1/user-goals`. This unblocks the Daily Loop
@@ -271,6 +271,6 @@ Open product-hardening notes: Validate intelligence quality with richer fixtures
 
 1. Verify Apple Health with a real export.
 2. Add dedicated lab import and lab-result review workflow.
-3. Expand fixture data to cover all registered metric domains.
+3. Expand fixture data to cover all registered metric domains. **Done 2026-06-18:** `api/test/seed-domains.mjs` now exports an explicit 1-25 fixture coverage manifest, seeds every active metric plus representative capability tables, and `domain-fixtures.test.mjs` verifies coverage, edge cases and determinism.
 4. Harden intelligence math with deterministic unit tests.
 5. Complete report UI coverage for quarterly and yearly briefings.

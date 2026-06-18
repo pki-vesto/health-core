@@ -23,6 +23,7 @@ import { run as briefingDiff } from './briefing-diff.test.mjs';
 import { run as briefingRoutes } from './briefing-routes.test.mjs';
 import { run as userGoals } from './user-goals.test.mjs';
 import { run as recommendationActions } from './recommendation-actions.test.mjs';
+import { run as domainFixtures } from './domain-fixtures.test.mjs';
 
 const SUITES = [
   ['intelligence', intelligence],
@@ -42,7 +43,8 @@ const SUITES = [
   ['briefing-diff', briefingDiff],
   ['briefing-routes', briefingRoutes],
   ['user-goals', userGoals],
-  ['recommendation-actions', recommendationActions]
+  ['recommendation-actions', recommendationActions],
+  ['domain-fixtures', domainFixtures]
 ];
 
 let total = 0;
