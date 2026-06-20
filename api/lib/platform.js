@@ -170,7 +170,7 @@ export function trainingIntelligence(db, params = {}) {
     regression: regression ? [{ metric: 'fitness.session_volume', evidence: volume }] : [],
     response: trendMap(trends).get('score.training_response') || null,
     adaptation: volume?.delta > 0 && fatigue < 70 ? 'positive' : fatigue >= 70 ? 'limited_by_recovery' : 'neutral',
-    prediction: predictions(db, { days: range.days, horizon: 14, metrics: 'fitness.session_volume' }).predictions[0] || null,
+    prediction: predictions(db, { to: range.to, days: range.days, horizon: 14, metrics: 'fitness.session_volume' }).predictions[0] || null,
     overtraining: fatigue >= 80,
     underload: volume?.avg != null && volume.avg < 1000,
     recommendations: trainingRecommendations(volume, fatigue),
