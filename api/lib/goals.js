@@ -1,4 +1,5 @@
 import { BadRequest, preferLatest } from './query.js';
+import { dateAdd } from './series.js';
 
 export const GOAL_STREAK_LOOKBACK_DAYS = 365;
 
@@ -23,32 +24,34 @@ export function progressSummary(db, options = {}) {
 }
 
 export function resolveDailyValue(db, metricKey, day) {
+  const from = dateAdd(day, -1);
+  const to = dateAdd(day, 2);
   const rows = db.prepare(`
     SELECT o.timestamp, o.metric_type, o.value, o.unit, s.name AS source,
            o.source_updated_at, o.updated_at
       FROM observations o
       JOIN sources s ON s.id = o.source
-     WHERE o.metric_type = ? AND substr(o.timestamp, 1, 10) = ?
+     WHERE o.metric_type = ? AND o.timestamp >= ? AND o.timestamp < ?
      ORDER BY o.updated_at DESC
-  `).all(metricKey, day);
+  `).all(metricKey, from, to).filter(row => amsterdamDay(row.timestamp) === day);
   return preferred(rows);
 }
 
 export function resolveLatestValue(db, metricKey, today) {
+  const to = dateAdd(today, 1);
   const rows = db.prepare(`
     SELECT o.timestamp, o.metric_type, o.value, o.unit, s.name AS source,
            o.source_updated_at, o.updated_at
       FROM observations o
       JOIN sources s ON s.id = o.source
-      JOIN (
-        SELECT MAX(substr(timestamp, 1, 10)) AS day
-          FROM observations
-         WHERE metric_type = ? AND substr(timestamp, 1, 10) <= ?
-      ) latest ON substr(o.timestamp, 1, 10) = latest.day
-     WHERE o.metric_type = ?
+     WHERE o.metric_type = ? AND o.timestamp < ?
      ORDER BY o.updated_at DESC
-  `).all(metricKey, today, metricKey);
-  return preferred(rows);
+  `).all(metricKey, to);
+  const byDay = rows
+    .map(row => ({ ...row, amsterdam_day: amsterdamDay(row.timestamp) }))
+    .filter(row => row.amsterdam_day <= today);
+  const latestDay = byDay.reduce((max, row) => row.amsterdam_day > max ? row.amsterdam_day : max, '');
+  return preferred(byDay.filter(row => row.amsterdam_day === latestDay));
 }
 
 export function evaluateComparator(value, comparator, target) {
@@ -138,7 +141,7 @@ function loadGoals(db, id) {
     return db.prepare(`
       SELECT id, title, metric_key, comparator, target_value, target_min, target_max, window, status
         FROM user_health_goals
-       WHERE id = ?
+       WHERE id = ? AND status = 'active'
     `).all(id);
   }
   return db.prepare(`
@@ -166,9 +169,13 @@ function preferred(rows) {
   return winner;
 }
 
-function assertGoalTable(db) {
+export function hasGoalTable(db) {
   const exists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='user_health_goals'").get();
-  if (!exists) throw new BadRequest("missing table 'user_health_goals'; run migrations");
+  return !!exists;
+}
+
+function assertGoalTable(db) {
+  if (!hasGoalTable(db)) throw new BadRequest("missing table 'user_health_goals'; run migrations");
 }
 
 function parseId(raw) {
@@ -178,6 +185,12 @@ function parseId(raw) {
 }
 
 function amsterdamDate(d = new Date()) {
+  return amsterdamDay(d);
+}
+
+function amsterdamDay(input) {
+  if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+  const d = input instanceof Date ? input : new Date(input);
   const fmt = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Amsterdam',
     year: 'numeric',
@@ -186,12 +199,6 @@ function amsterdamDate(d = new Date()) {
   });
   const parts = Object.fromEntries(fmt.formatToParts(d).filter(p => p.type !== 'literal').map(p => [p.type, p.value]));
   return `${parts.year}-${parts.month}-${parts.day}`;
-}
-
-function dateAdd(date, days) {
-  const d = new Date(date + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
 }
 
 function round4(x) {

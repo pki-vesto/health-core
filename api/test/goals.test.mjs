@@ -2,16 +2,12 @@
 // path deterministic: no writes during progress computation, explicit today,
 // and source-precedence conflicts locked to ADR-008.
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
 import { rmSync } from 'node:fs';
 import express from 'express';
 import { buildDb, closeDb, insertObs, seedDaily, harness } from './fixtures.mjs';
 import {
-  evaluateComparator, percentToTarget, resolveDailyValue, goalProgress
+  evaluateComparator, percentToTarget, resolveDailyValue, resolveLatestValue, goalProgress
 } from '../lib/goals.js';
-
-const require = createRequire(process.env.NODE_MODULES_BASE || '/app/node_modules/');
-const Database = require('better-sqlite3');
 
 const TODAY = '2026-06-20';
 
@@ -45,6 +41,23 @@ export async function run() {
     insertObs(db, { metric: 'nutrition.protein', date: TODAY, value: 110, source: 'manual', sourceUpdatedAt: '2026-06-20T08:00:00.000Z' });
     const row = resolveDailyValue(db, 'nutrition.protein', TODAY);
     t.eq('daily value uses ADR-008 precedence', { value: row.value, source: row.source }, { value: 110, source: 'manual' });
+    closeDb(db);
+  }
+
+  {
+    const db = buildDb();
+    insertObs(db, { metric: 'nutrition.protein', date: '2026-06-19T22:30:00.000Z', value: 130, externalId: 'protein-amsterdam-today' });
+    const row = resolveDailyValue(db, 'nutrition.protein', TODAY);
+    t.eq('daily value buckets late UTC as Amsterdam today', { value: row.value, timestamp: row.timestamp }, { value: 130, timestamp: '2026-06-19T22:30:00.000Z' });
+    closeDb(db);
+  }
+
+  {
+    const db = buildDb();
+    insertObs(db, { metric: 'body.weight', date: '2026-06-19T22:30:00.000Z', value: 81, externalId: 'weight-amsterdam-today' });
+    insertObs(db, { metric: 'body.weight', date: '2026-06-20T22:30:00.000Z', value: 82, externalId: 'weight-amsterdam-tomorrow' });
+    const row = resolveLatestValue(db, 'body.weight', TODAY);
+    t.eq('latest value ignores Amsterdam future day', { value: row.value, timestamp: row.timestamp }, { value: 81, timestamp: '2026-06-19T22:30:00.000Z' });
     closeDb(db);
   }
 
@@ -129,6 +142,7 @@ async function routeTests(t) {
   const tmp = buildDb();
   const path = tmp.__path;
   const id = addGoal(tmp, { title: 'Protein route', metric: 'nutrition.protein', comparator: 'gte', value: 100, window: 'daily' });
+  const inactiveId = addGoal(tmp, { title: 'Inactive route', metric: 'nutrition.protein', comparator: 'gte', value: 100, window: 'daily', status: 'paused' });
   insertObs(tmp, { metric: 'nutrition.protein', date: tmp.prepare("SELECT date('now') AS d").get().d, value: 125 });
   try { tmp.close(); } catch {}
 
@@ -150,6 +164,7 @@ async function routeTests(t) {
     t.ok('route all active returns progress array', Array.isArray(all.goals) && all.goals.length === 1 && all.goals[0].metric_key === 'nutrition.protein');
     const one = await fetch(`${base}/user-goals/${id}/progress`).then(r => r.json());
     t.eq('route one returns goal', one.goal.id, Number(id));
+    t.eq('route inactive id → 404', (await fetch(`${base}/user-goals/${inactiveId}/progress`)).status, 404);
     t.eq('route bad id → 400', (await fetch(`${base}/user-goals/abc/progress`)).status, 400);
     t.eq('route unknown id → 404', (await fetch(`${base}/user-goals/9999/progress`)).status, 404);
   } finally {
