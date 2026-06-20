@@ -257,6 +257,10 @@ function amsterdamNowIso(d = new Date()) {
   return `${parts.year}-${parts.month}-${parts.day}T${hh}:${parts.minute}:${parts.second}${offset}`;
 }
 
+function amsterdamDate(d = new Date()) {
+  return amsterdamNowIso(d).slice(0, 10);
+}
+
 function amsterdamOffset(d) {
   // Amsterdam = CET (UTC+1) in winter, CEST (UTC+2) in summer. Compute by
   // diffing the same wall clock interpreted in UTC vs Europe/Amsterdam.
@@ -291,6 +295,33 @@ export function healthGoals(db) {
 export function progress(db) {
   const rows = db.prepare('SELECT status, COUNT(*) AS n FROM health_goals GROUP BY status').all();
   return { goals: Object.fromEntries(rows.map(r => [r.status, r.n])) };
+}
+
+export function goalProgress(db) {
+  const goals = db.prepare(
+    `SELECT id, domain, title, status, evidence, updated_at
+       FROM health_goals
+      ORDER BY id`
+  ).all();
+  const goals_due = goals
+    .filter(g => ['partial', 'not_built', 'planned', 'pending', 'todo', 'in_progress', 'active'].includes(String(g.status)))
+    .map(g => goalDigestItem(g, 'due'));
+  const goals_off_track = goals
+    .filter(g => ['blocked', 'off_track', 'at_risk', 'overdue', 'stalled'].includes(String(g.status)))
+    .map(g => goalDigestItem(g, 'off_track'));
+  const complete = goals.filter(g => g.status === 'complete').length;
+  const streaks = complete > 0 ? [{
+    type: 'goal_completion',
+    label: 'Completed goal streak',
+    value: complete,
+    unit: 'goals',
+    priority: 'info'
+  }] : [];
+  return {
+    goals_due: sortDigestItems(goals_due),
+    goals_off_track: sortDigestItems(goals_off_track),
+    streaks: sortDigestItems(streaks)
+  };
 }
 
 // Non-clinical disclaimer attached to every decision-support surface. Worded so
@@ -394,9 +425,98 @@ export function operatingSystem(db) {
     status: 'operational',
     profile: healthProfile(db),
     progress: progress(db),
-    today: brief(db, 'daily'),
+    today: todayDigest(db),
     decision_support: decisionSupport(db)
   };
+}
+
+export function todayDigest(db, { now = new Date() } = {}) {
+  const latestBriefing = latestDailyBriefingSnapshot(db);
+  const payload = latestBriefing?.payload && typeof latestBriefing.payload === 'object'
+    ? latestBriefing.payload
+    : {};
+  const goal = goalProgress(db);
+  const openRecommendations = decisionSupport(db).recommendations
+    .map(r => ({ ...r, priority: r.priority || 'review' }));
+  const alerts = Array.isArray(payload.alerts) ? payload.alerts : [];
+  const highlights = [
+    ...alerts.map((a, i) => ({
+      type: a.type || 'alert',
+      priority: severityPriority(a.severity) || 'alert',
+      source: 'briefing_alert',
+      order: i,
+      ...a
+    })),
+    ...(Array.isArray(payload.highlights) ? payload.highlights : []).map((h, i) => ({
+      type: h.type || h.metric || 'highlight',
+      priority: h.priority || 'info',
+      source: 'briefing_highlight',
+      order: i,
+      ...h
+    }))
+  ];
+
+  return {
+    date: amsterdamDate(now),
+    briefing_summary: payload.summary && typeof payload.summary === 'object' ? payload.summary : {},
+    open_recommendations: sortDigestItems(openRecommendations),
+    goals_due: goal.goals_due,
+    goals_off_track: goal.goals_off_track,
+    streaks: goal.streaks,
+    highlights: sortDigestItems(highlights),
+    disclaimer: DECISION_DISCLAIMER
+  };
+}
+
+function latestDailyBriefingSnapshot(db) {
+  try {
+    const row = db.prepare(
+      `SELECT id, period, generated_at, payload, summary
+         FROM briefing_snapshots
+        WHERE period = 'daily'
+        ORDER BY generated_at DESC, id DESC
+        LIMIT 1`
+    ).get();
+    if (!row) return null;
+    return { ...row, payload: safeJson(row.payload), summary: safeJson(row.summary) };
+  } catch {
+    return null;
+  }
+}
+
+function goalDigestItem(goal, bucket) {
+  return {
+    id: goal.id,
+    domain: goal.domain,
+    title: goal.title,
+    status: goal.status,
+    evidence: goal.evidence,
+    updated_at: goal.updated_at,
+    priority: bucket === 'off_track' ? 'alert' : 'due'
+  };
+}
+
+function severityPriority(severity) {
+  if (severity === 'high') return 'alert';
+  if (severity === 'medium') return 'review';
+  if (severity === 'low') return 'monitor';
+  return null;
+}
+
+function sortDigestItems(items) {
+  return [...items].sort((a, b) => {
+    const pa = priorityRank(a.priority);
+    const pb = priorityRank(b.priority);
+    if (pa !== pb) return pa - pb;
+    const oa = a.order ?? Number.MAX_SAFE_INTEGER;
+    const ob = b.order ?? Number.MAX_SAFE_INTEGER;
+    if (oa !== ob) return oa - ob;
+    return String(a.rec_key ?? a.id ?? a.type ?? a.title ?? '').localeCompare(String(b.rec_key ?? b.id ?? b.type ?? b.title ?? ''));
+  }).map(({ order, ...item }) => item);
+}
+
+function priorityRank(priority) {
+  return { alert: 0, off_track: 0, high: 0, review: 1, due: 2, monitor: 3, info: 4, low: 5 }[priority] ?? 6;
 }
 
 function panel(db, metrics, params) {

@@ -95,3 +95,15 @@ Date: 2026-06-09
 - Real lab report format validation (external: sample reports; parser ready).
 - FEATURE_AUDIT re-classification.
 - Manual quick-log and health milestones restored; continue hardening with real usage data.
+
+## 2026-06-20 — Daily digest / Today API (issue #36)
+
+- Added `todayDigest()` in `api/lib/health-os.js`: read-only assembly of latest
+  persisted daily briefing summary, lifecycle-filtered open recommendations,
+  deterministic goal due/off-track/streak sections, priority-sorted highlights
+  and the canonical `DECISION_DISCLAIMER`.
+- `operatingSystem()` now uses the same digest for its `today` field; v1 exposes
+  `GET /api/v1/today` plus `GET /api/v1/os` as a digest alias.
+- Added fixture coverage for mixed content, all-empty state, priority ordering,
+  snoozed recommendation exclusion, disclaimer presence and Europe/Amsterdam
+  date calculation. Smoke now checks `/api/v1/today`.

@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { buildDb, closeDb, insertObs, seedDaily, harness } from './fixtures.mjs';
 import {
   biomarkerScorecard, abnormalBiomarkers, biomarkerTrends, cardiometabolicScore,
-  stressSummary, brief, decisionSupport
+  stressSummary, brief, decisionSupport, todayDigest, snapshotBriefing, recKey,
+  DECISION_DISCLAIMER
 } from '../lib/health-os.js';
 
 const TO = '2026-03-01';
@@ -139,6 +140,78 @@ export function run() {
     const crp = ds.recommendations.find(r => r.type === 'biomarker' && r.message.includes('C-reactive protein'));
     t.eq('biomarker recommendation', crp && { type: crp.type, priority: crp.priority }, { type: 'biomarker', priority: 'review' });
     t.ok('decision support carries non-clinical note', /does not replace medical advice/i.test(ds.note));
+    closeDb(db);
+  }
+
+  // ── todayDigest: persisted briefing + open recs + goal progress ───────────
+  {
+    const db = buildDb();
+    const today = db.prepare("SELECT date('now') AS d").get().d;
+    snapshotBriefing(db, {
+      period: 'daily',
+      generated_at: `${today}T08:00:00+02:00`,
+      summary: { readiness: 72, recovery: 'steady' },
+      highlights: [
+        { type: 'body_weight', message: 'Weight trend is stable.' },
+        { type: 'sleep', priority: 'monitor', message: 'Sleep dipped yesterday.' }
+      ],
+      alerts: [{ type: 'stress', severity: 'high', message: 'Stress signals are elevated.' }],
+      decisions: [],
+      disclaimer: DECISION_DISCLAIMER
+    }, { period: 'daily' });
+    insertObs(db, { metric: 'blood.crp', date: today, value: 5.0, source: 'lab' });
+    insertObs(db, { metric: 'blood.vitamin_d', date: today, value: 40, source: 'lab' });
+    db.prepare("UPDATE health_goals SET status = 'blocked' WHERE id = 1").run();
+    db.prepare("UPDATE health_goals SET status = 'partial' WHERE id = 2").run();
+    db.prepare(
+      `INSERT INTO recommendation_actions (rec_key, status, snooze_until, created_at)
+       VALUES (?, 'snoozed', '2099-01-01T00:00:00+02:00', datetime('now'))`
+    ).run(recKey({ type: 'biomarker', metric: 'blood.vitamin_d' }));
+
+    const digest = todayDigest(db, { now: new Date(`${today}T12:00:00Z`) });
+    t.eq('today digest stable keys', Object.keys(digest), [
+      'date', 'briefing_summary', 'open_recommendations', 'goals_due',
+      'goals_off_track', 'streaks', 'highlights', 'disclaimer'
+    ]);
+    t.eq('today digest uses persisted briefing summary', digest.briefing_summary, { readiness: 72, recovery: 'steady' });
+    t.eq('today digest excludes snoozed recs',
+      digest.open_recommendations.map(r => r.rec_key), [recKey({ type: 'biomarker', metric: 'blood.crp' })]);
+    t.ok('today digest recommendation carries priority',
+      digest.open_recommendations.every(r => r.priority));
+    t.eq('today digest off-track before due by bucket',
+      { off: digest.goals_off_track.map(g => g.id), due: digest.goals_due.map(g => g.id) },
+      { off: [1], due: [2] });
+    t.eq('today digest highlights ordered by priority',
+      digest.highlights.map(h => h.type), ['stress', 'sleep', 'body_weight']);
+    t.ok('today digest streaks carry priority', digest.streaks.every(s => s.priority));
+    t.eq('today digest disclaimer', digest.disclaimer, DECISION_DISCLAIMER);
+    closeDb(db);
+  }
+
+  // ── todayDigest: all-empty state never returns null arrays ─────────────────
+  {
+    const db = buildDb();
+    db.prepare('DELETE FROM recommendation_actions').run();
+    db.prepare('DELETE FROM briefing_snapshots').run();
+    db.prepare('DELETE FROM observations').run();
+    db.prepare('DELETE FROM health_goals').run();
+    const digest = todayDigest(db, { now: new Date('2026-03-28T23:30:00Z') });
+    t.eq('today digest Europe/Amsterdam date', digest.date, '2026-03-29');
+    t.eq('today digest empty summary', digest.briefing_summary, {});
+    t.eq('today digest empty arrays', {
+      open_recommendations: digest.open_recommendations,
+      goals_due: digest.goals_due,
+      goals_off_track: digest.goals_off_track,
+      streaks: digest.streaks,
+      highlights: digest.highlights
+    }, {
+      open_recommendations: [],
+      goals_due: [],
+      goals_off_track: [],
+      streaks: [],
+      highlights: []
+    });
+    t.eq('today digest empty disclaimer', digest.disclaimer, DECISION_DISCLAIMER);
     closeDb(db);
   }
 

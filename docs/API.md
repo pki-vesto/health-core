@@ -156,8 +156,13 @@ not included in the prompt text and are not invented by the implementation.
 - `GET /api/v1/milestones` — persisted health milestones.
 - `GET /api/v1/progress` — progress monitoring.
 - `GET /api/v1/decision-support` — informational decision support.
+- `GET /api/v1/today` — stable daily digest assembled from the latest persisted
+  daily briefing, lifecycle-filtered open recommendations and deterministic
+  goal progress: `{ date, briefing_summary, open_recommendations,
+  goals_due, goals_off_track, streaks, highlights, disclaimer }`.
+- `GET /api/v1/os` — alias for the daily digest surface.
 - `GET /api/v1/operating-system` — combined personal Health Operating System
-  projection.
+  projection, with `today` backed by the same daily digest helper.
 
 ## Write / Ingest (v1)
 

@@ -193,6 +193,14 @@ console.log(`Core API smoke tests → ${BASE}`);
   ok('daily briefing shape', body?.period === 'daily' && body?.summary);
 }
 {
+  const { status, body } = await get('/api/v1/today');
+  ok('GET /api/v1/today → 200', status === 200, `got ${status}`);
+  ok('today digest stable shape',
+    body?.date && body?.briefing_summary && Array.isArray(body?.open_recommendations) &&
+    Array.isArray(body?.goals_due) && Array.isArray(body?.goals_off_track) &&
+    Array.isArray(body?.streaks) && Array.isArray(body?.highlights) && body?.disclaimer);
+}
+{
   const { status, body } = await get('/api/v1/operating-system');
   ok('GET /api/v1/operating-system → 200', status === 200, `got ${status}`);
   ok('operating system status', body?.status === 'operational' && body?.decision_support);

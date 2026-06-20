@@ -7,6 +7,10 @@ available through `scripts/backup-core.mjs` and `/api/v1/export/observations*`.
 Manual quick-log is available through the Track UI and posts to the existing
 generic ingest path with stable same-day correction semantics.
 
+Implementation note 2026-06-20: The Daily Loop backend now exposes
+`/api/v1/today`, a stable read-only digest over persisted daily briefing
+snapshots, lifecycle-filtered recommendations and goal progress.
+
 This is the central machine-readable backlog. The JSON block is the source of truth for goals 1-250.
 
 ```json
