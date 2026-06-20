@@ -354,6 +354,20 @@ body {
 .more-tile span { font-size: 12px; font-weight: 600; }
 
 .today-hero { background: radial-gradient(130% 120% at 12% 0%, var(--accent-soft), transparent 55%), var(--surface); }
+.today-highlight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.today-highlight { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: var(--r-md); background: color-mix(in srgb, var(--surface-raised) 68%, transparent); border: 1px solid var(--line); min-width: 0; }
+.today-highlight .ttl { font-size: 13px; font-weight: 700; line-height: 1.25; }
+.today-highlight .meta { font-size: 11.5px; color: var(--ink-3); line-height: 1.45; margin-top: 3px; }
+.today-disclaimer { display: flex; align-items: flex-start; gap: 8px; margin: -8px 0 22px; padding: 11px 13px; border-radius: var(--r-md); background: var(--info-soft); color: var(--info); font-size: 12.5px; line-height: 1.45; font-weight: 600; }
+.today-disclaimer svg { flex: 0 0 auto; margin-top: 1px; }
+.today-layout { align-items: start; }
+.today-rec h3 { margin: 0; font-size: 15px; font-weight: 750; line-height: 1.25; }
+.today-rec p { margin: 8px 0 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.5; }
+.today-rec-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+.today-rec-msg { margin-top: 8px; min-height: 16px; }
+.today-goal-progress-card .track { height: 9px; }
+.today-streak-line { display: flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--accent-ink); font-size: 12px; font-weight: 700; }
+.today-empty svg { color: var(--ink-3); }
 
 .report-thumb { width: 46px; height: 58px; border-radius: 8px; flex: 0 0 auto; background: linear-gradient(160deg, var(--surface-2), var(--surface)); border: 1px solid var(--line); display: grid; place-items: center; color: var(--accent); box-shadow: var(--shadow-sm); }
 .report-cover { border-radius: var(--r-lg); padding: 26px 24px; background: radial-gradient(120% 130% at 90% 0%, color-mix(in srgb, var(--accent) 55%, #1d3a32), transparent 70%), linear-gradient(150deg, #2f5145, #1c332c); display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
