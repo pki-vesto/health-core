@@ -89,6 +89,19 @@ Date: 2026-06-09
 - `unit.mjs` now awaits suite results so the async HTTP route suite can join the
   aggregate run. Full suite green (16/16). Governance + schema drift clean.
 
+## 2026-06-20 — Today Health OS action surface (issue #37)
+
+- Reworked the `Vandaag` tab into a Health OS daily-loop surface backed by
+  `/api/v1/operating-system` and `/api/v1/health-goals`: digest summary,
+  highlights, open recommendations, due/off-track goals, goal progress, streaks
+  and the non-clinical disclaimer.
+- Added inline recommendation lifecycle actions (`acknowledged`, `snoozed`,
+  `dismissed`, `done`) posting to
+  `/api/v1/recommendations/:rec_key/action`; successful actions remove the item
+  from the active list without a full page reload.
+- Added scoped Today UI styling plus Playwright coverage for digest rendering,
+  action removal, goal progress and empty states.
+
 ## Still Open
 
 - Real Apple Health export verification (external: phone export; tooling ready).

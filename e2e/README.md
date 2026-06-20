@@ -1,10 +1,11 @@
 # Health Core — UI end-to-end tests (Playwright)
 
 Browser coverage for the redesigned "Personal Health OS" web app: shell + sidebar,
-navigation across all 11 views, charts/tiles, theme toggle + settings (accent/
-density), the Lab import/review tab (under Gezondheid), and the Reports view
-(daily → yearly, incl. quarterly/yearly). `verify.mjs` is a quick manual driver
-that screenshots light/dark and reports console errors.
+navigation across all 12 views, the Today Health OS digest/action surface,
+charts/tiles, theme toggle + settings (accent/density), the Lab import/review
+tab (under Gezondheid), and the Reports view (daily → yearly, incl.
+quarterly/yearly). `verify.mjs` is a quick manual driver that screenshots
+light/dark and reports console errors.
 
 ## Run
 
@@ -40,8 +41,8 @@ that screenshots light/dark and reports console errors.
 
 ## Notes
 
-- The lab spec only **parses** (read-only); it does not commit, so it is safe to
-  run against any instance. The suite is read-only and passes against the live
-  Core too: `BASE_URL=http://localhost:8091 npx playwright test`.
+- The lab spec only **parses** (read-only); it does not commit. The Today spec
+  mocks its digest/action API calls and verifies the recommendation lifecycle
+  POST shape without mutating a live Core.
 - `playwright.config.js` runs headless Chromium only, parallel, with traces
   retained on failure (`test-results/`).

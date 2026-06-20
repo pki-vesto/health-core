@@ -5040,11 +5040,11 @@ This is the central machine-readable backlog. The JSON block is the source of tr
       231
     ],
     "acceptance_criteria": [
-      "Code evidence exists: GET /operating-system",
+      "Code evidence exists: GET /operating-system + Today UI digest/actions",
       "Behavior is reachable through API, UI, migration or ingest path as applicable.",
       "Tests or audit evidence cover the contract before future status upgrades."
     ],
-    "evidence": "GET /operating-system"
+    "evidence": "GET /operating-system + Today UI digest/actions"
   }
 ]
 ```

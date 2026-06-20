@@ -30,4 +30,6 @@ Offline suite: `node test/unit.mjs` (10 suites). Live: `test/smoke.mjs`,
 1. Run a real Auto Health Export through `scripts/import-apple-health.mjs` (dry-run → add any unmapped aliases → `--post`); fill the observed-field-names table in `docs/APPLE-HEALTH-IMPORT.md`. External dep: a real phone export.
 2. Validate the lab parser against real lab report formats; extend analyte aliases/conversions as needed. External dep: representative lab reports.
 3. Re-classify `audit/FEATURE_AUDIT.md` backend-only goals now covered by tests/data tooling, keeping the header summary in sync.
-4. Consume `briefing_snapshots` from the daily-loop epic: a digest endpoint that walks the latest N daily snapshots + a UI "wat is er veranderd" surface that calls `/briefing/:id/diff`. Depends on issue #32 (now done).
+4. Extend the Today Health OS surface with briefing history/diff once the digest
+   endpoint exposes latest-N snapshot context; the current Today tab already
+   renders the daily digest, actions, goal progress, streaks and disclaimer.
