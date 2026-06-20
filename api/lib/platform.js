@@ -107,7 +107,7 @@ export function sleepAdvanced(db, params = {}) {
     deficits: debt.days_below_target,
     sleep_debt: debt,
     quality_score: sleepQuality(duration, debt),
-    prediction: predictions(db, { days: range.days, horizon: 7, metrics: 'sleep.duration' }).predictions[0] || null,
+    prediction: predictions(db, { to: range.to, days: range.days, horizon: 7, metrics: 'sleep.duration' }).predictions[0] || null,
     trends
   };
 }
@@ -170,7 +170,7 @@ export function trainingIntelligence(db, params = {}) {
     regression: regression ? [{ metric: 'fitness.session_volume', evidence: volume }] : [],
     response: trendMap(trends).get('score.training_response') || null,
     adaptation: volume?.delta > 0 && fatigue < 70 ? 'positive' : fatigue >= 70 ? 'limited_by_recovery' : 'neutral',
-    prediction: predictions(db, { days: range.days, horizon: 14, metrics: 'fitness.session_volume' }).predictions[0] || null,
+    prediction: predictions(db, { to: range.to, days: range.days, horizon: 14, metrics: 'fitness.session_volume' }).predictions[0] || null,
     overtraining: fatigue >= 80,
     underload: volume?.avg != null && volume.avg < 1000,
     recommendations: trainingRecommendations(volume, fatigue),
@@ -195,7 +195,7 @@ export function longitudinal(db, params = {}) {
     milestones: db.prepare('SELECT * FROM health_milestones ORDER BY timestamp DESC LIMIT 50').all(),
     comparisons: compareWindows(db, [metric], range),
     life_course: { first: yearly[0] || null, latest: yearly[yearly.length - 1] || null },
-    projections: predictions(db, { days: Math.min(range.days, 730), horizon: 90, metrics: metric }).predictions
+    projections: predictions(db, { to: range.to, days: Math.min(range.days, 730), horizon: 90, metrics: metric }).predictions
   };
 }
 
