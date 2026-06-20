@@ -119,6 +119,22 @@ All intelligence routes are read-only projections over `observations`.
 - `GET /api/v1/product/status` — maturity/status view, system counts and
   architecture invariants.
 
+## User Goal Progress
+
+- `GET /api/v1/user-goals/progress` — progress for all active owner-defined
+  goals in `user_health_goals`.
+- `GET /api/v1/user-goals/:id/progress` — progress for one goal (`400` for a
+  malformed id, `404` when absent).
+
+Each item reports `metric_key`, `comparator`, `target`, `current_value`,
+`met_today`, `percent_to_target`, `status`, and the source/timestamp of the
+selected value. Daily goals also report `current_streak` and `longest_streak`
+over Europe/Amsterdam calendar days. Missing-data days break streaks; they are
+not skipped. When multiple observations exist for the same metric/day, the read
+model uses ADR-008 source precedence (`manual > lab > apple_health > shred >
+health_core > unknown`) with latest source timestamp as the same-source tie
+breaker.
+
 ## Health OS Read API (supplied goals 101-130, 241-250)
 
 The supplied post-100 backlog includes Domains 11-13 and 25. Goals 131-240 were

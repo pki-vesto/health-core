@@ -7,6 +7,11 @@ available through `scripts/backup-core.mjs` and `/api/v1/export/observations*`.
 Manual quick-log is available through the Track UI and posts to the existing
 generic ingest path with stable same-day correction semantics.
 
+Implementation note 2026-06-20: owner-defined goal progress is available via
+`api/lib/goals.js` and `GET /api/v1/user-goals/progress`. Daily adherence
+streaks are computed read-only from observations; missing calendar days in
+Europe/Amsterdam break the streak.
+
 This is the central machine-readable backlog. The JSON block is the source of truth for goals 1-250.
 
 ```json

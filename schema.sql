@@ -2,7 +2,7 @@
 -- Source of truth: scripts/lib/coredb.mjs (SCHEMA) + migrations/*.sql
 -- Regenerate: node scripts/dump-schema.mjs   |   verify: --check
 -- Runtime-only (created by scripts/migrate.mjs, not a migration): schema_migrations.
--- Tables: 16, Indexes: 11
+-- Tables: 17, Indexes: 13
 
 CREATE TABLE biomarker_reference_ranges (
   id          INTEGER PRIMARY KEY,
@@ -187,4 +187,27 @@ CREATE TABLE symptom_categories (
   label       TEXT NOT NULL,
   description TEXT
 );
+
+CREATE TABLE user_health_goals (
+  id           INTEGER PRIMARY KEY,
+  title        TEXT NOT NULL,
+  metric_key   TEXT NOT NULL REFERENCES metric_types(key),
+  comparator   TEXT NOT NULL CHECK (comparator IN ('gte','lte','eq','range')),
+  target_value REAL,
+  target_min   REAL,
+  target_max   REAL,
+  window       TEXT NOT NULL DEFAULT 'latest' CHECK (window IN ('latest','daily')),
+  status       TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused','archived')),
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  CHECK (
+    (comparator IN ('gte','lte','eq') AND target_value IS NOT NULL AND target_min IS NULL AND target_max IS NULL)
+    OR
+    (comparator = 'range' AND target_min IS NOT NULL AND target_max IS NOT NULL AND target_value IS NULL AND target_min <= target_max)
+  )
+);
+CREATE INDEX idx_user_health_goals_metric
+  ON user_health_goals(metric_key);
+CREATE INDEX idx_user_health_goals_status
+  ON user_health_goals(status);
 

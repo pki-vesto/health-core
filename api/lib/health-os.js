@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { BadRequest, isDate, preferLatest } from './query.js';
 import { dashboard, correlations } from './intelligence.js';
+import { progressSummary } from './goals.js';
 
 export const BRIEFING_PERIODS = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
 
@@ -289,8 +290,13 @@ export function healthGoals(db) {
 }
 
 export function progress(db) {
-  const rows = db.prepare('SELECT status, COUNT(*) AS n FROM health_goals GROUP BY status').all();
-  return { goals: Object.fromEntries(rows.map(r => [r.status, r.n])) };
+  try {
+    return progressSummary(db);
+  } catch (e) {
+    if (!String(e.message || '').includes("missing table 'user_health_goals'")) throw e;
+    const rows = db.prepare('SELECT status, COUNT(*) AS n FROM health_goals GROUP BY status').all();
+    return { goals: Object.fromEntries(rows.map(r => [r.status, r.n])) };
+  }
 }
 
 // Non-clinical disclaimer attached to every decision-support surface. Worded so

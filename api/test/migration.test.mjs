@@ -28,7 +28,7 @@ const REQUIRED_TABLES = [
   'ingest_log', 'quarantine', 'health_goals', 'biomarker_registry',
   'biomarker_reference_ranges', 'lab_results', 'insight_events',
   'health_milestones', 'symptom_categories', 'briefing_snapshots',
-  'recommendation_actions'
+  'recommendation_actions', 'user_health_goals'
 ];
 
 const REQUIRED_SOURCES = ['manual', 'shred', 'apple_health', 'lab', 'health_core'];

@@ -197,6 +197,11 @@ console.log(`Core API smoke tests → ${BASE}`);
   ok('GET /api/v1/operating-system → 200', status === 200, `got ${status}`);
   ok('operating system status', body?.status === 'operational' && body?.decision_support);
 }
+{
+  const { status, body } = await get('/api/v1/user-goals/progress');
+  ok('GET /api/v1/user-goals/progress → 200', status === 200, `got ${status}`);
+  ok('user goal progress shape', Array.isArray(body?.goals));
+}
 
 // Full platform routes (goals 131-240)
 for (const [path, check] of [
