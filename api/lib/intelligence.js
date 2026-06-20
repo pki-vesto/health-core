@@ -17,6 +17,7 @@ const CORE_METRICS = [
 const RECOVERY_METRICS = ['heart.hrv_sdnn', 'sleep.duration', 'heart.resting_rate'];
 const TRAINING_METRICS = ['fitness.session_volume', 'activity.steps', 'fitness.vo2max'];
 const NUTRITION_METRICS = ['nutrition.calories', 'nutrition.protein', 'nutrition.carbs', 'nutrition.fat'];
+const PREDICTION_INTERVAL_Z = 1.96;
 
 export function platformStatus(db) {
   const counts = db.prepare(`
@@ -126,7 +127,7 @@ export function predictions(db, params = {}) {
   return {
     range: { from, to, days },
     horizon_days: horizon,
-    predictions: metrics.map(metric => forecastMetric(db, metric, from, to, horizon)).filter(Boolean)
+    predictions: metrics.map(metric => forecastMetric(db, metric, from, to, horizon, { backtest: truthy(params.backtest) })).filter(Boolean)
   };
 }
 
@@ -253,25 +254,100 @@ function dailyMetricMap(db, metrics, from, to) {
   return daily;
 }
 
-function forecastMetric(db, metric, from, to, horizon) {
-  const rows = db.prepare(`
+export function backtestForecastMetric(db, metric, from, to, opts = {}) {
+  const rows = dailyMetricRows(db, metric, from, to);
+  return backtestRows(rows, opts);
+}
+
+function dailyMetricRows(db, metric, from, to) {
+  return db.prepare(`
     SELECT timestamp, AVG(value) AS value
       FROM observations
      WHERE metric_type = ? AND timestamp BETWEEN ? AND ?
      GROUP BY timestamp ORDER BY timestamp
   `).all(metric, from, to);
+}
+
+function forecastMetric(db, metric, from, to, horizon, opts = {}) {
+  const rows = dailyMetricRows(db, metric, from, to);
   if (rows.length < 3) return null;
-  const t0 = Date.parse(rows[0].timestamp + 'T00:00:00Z') / 86400000;
-  const points = rows.map(r => [Date.parse(r.timestamp + 'T00:00:00Z') / 86400000 - t0, r.value]);
-  const line = linear(points);
+  const points = rowsToPoints(rows);
   const lastX = points[points.length - 1][0];
-  return {
+  const forecast = forecastPoints(points, lastX + horizon);
+  const out = {
     metric,
     n: rows.length,
-    slope_per_day: round4(line.slope),
-    next: round4(line.intercept + line.slope * (lastX + horizon)),
-    confidence: rows.length >= 30 ? 'medium' : 'low'
+    slope_per_day: round4(forecast.slope),
+    next: round4(forecast.next),
+    confidence: confidenceForFit(forecast.r2),
+    fit_quality: fitQuality(forecast.r2),
+    r2: round4(forecast.r2),
+    residual_std: round4(forecast.residualStd),
+    interval: {
+      low: round4(forecast.interval.low),
+      high: round4(forecast.interval.high)
+    }
   };
+  if (opts.backtest) out.backtest = backtestRows(rows);
+  return out;
+}
+
+function rowsToPoints(rows) {
+  const t0 = Date.parse(rows[0].timestamp + 'T00:00:00Z') / 86400000;
+  return rows.map(r => [Date.parse(r.timestamp + 'T00:00:00Z') / 86400000 - t0, r.value]);
+}
+
+function forecastPoints(points, targetX) {
+  const line = linear(points);
+  const next = line.intercept + line.slope * targetX;
+  const residuals = points.map(([x, y]) => y - (line.intercept + line.slope * x));
+  const sse = residuals.reduce((sum, r) => sum + r ** 2, 0);
+  const yMean = mean(points.map(p => p[1]));
+  const sst = points.reduce((sum, [, y]) => sum + (y - yMean) ** 2, 0);
+  const residualStd = Math.sqrt(sse / (points.length - 2));
+  // Simple deterministic approximate 95% prediction interval: prediction +/- 1.96 * residual standard error.
+  const margin = PREDICTION_INTERVAL_Z * residualStd;
+  return {
+    slope: line.slope,
+    intercept: line.intercept,
+    next,
+    r2: sst === 0 ? 1 : 1 - sse / sst,
+    residualStd,
+    interval: { low: next - margin, high: next + margin }
+  };
+}
+
+function backtestRows(rows, opts = {}) {
+  if (rows.length < 4) return null;
+  const requested = opts.holdout == null ? Math.min(7, Math.floor(rows.length / 3)) : clampInt(opts.holdout, 1, 1, rows.length - 3);
+  const holdout = Math.min(requested, rows.length - 3);
+  if (holdout < 1) return null;
+  const points = rowsToPoints(rows);
+  const start = rows.length - holdout;
+  const errors = [];
+  for (let i = start; i < rows.length; i++) {
+    const training = points.slice(0, i);
+    if (training.length < 3) continue;
+    errors.push(forecastPoints(training, points[i][0]).next - points[i][1]);
+  }
+  if (!errors.length) return null;
+  return {
+    count: errors.length,
+    mae: round4(mean(errors.map(e => Math.abs(e)))),
+    mean_error: round4(mean(errors))
+  };
+}
+
+function confidenceForFit(r2) {
+  if (r2 >= 0.8) return 'high';
+  if (r2 >= 0.5) return 'medium';
+  return 'low';
+}
+
+function fitQuality(r2) {
+  if (r2 >= 0.8) return 'good';
+  if (r2 >= 0.5) return 'fair';
+  return 'poor';
 }
 
 function checkedDate(s) {
@@ -284,6 +360,10 @@ function clampInt(v, fallback, min, max) {
   let n = parseInt(v ?? fallback, 10);
   if (!Number.isFinite(n)) n = fallback;
   return Math.max(min, Math.min(max, n));
+}
+
+function truthy(v) {
+  return v === true || v === 1 || v === '1' || v === 'true' || v === 'yes';
 }
 
 function assertMetric(db, metric) {
