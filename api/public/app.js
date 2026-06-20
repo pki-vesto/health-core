@@ -355,7 +355,12 @@ const FONT_STACKS = {
 };
 
 const PRIORITY_RANK = { critical: 0, high: 1, review: 1, urgent: 1, medium: 2, monitor: 2, normal: 3, low: 4 };
-const ACTION_LABELS = { acknowledged: 'Erken', snoozed: 'Snooze', dismissed: 'Wijs af', done: 'Gedaan' };
+const ACTIONS = {
+  acknowledge: { label: 'Erken', status: 'acknowledged', icon: 'info' },
+  snooze: { label: 'Snooze', status: 'snoozed', icon: 'clock' },
+  dismiss: { label: 'Wijs af', status: 'dismissed', icon: 'close' },
+  done: { label: 'Gedaan', status: 'done', icon: 'check' }
+};
 const TODAY_DISCLAIMER = 'Informational context derived from your own data. It does not replace medical advice or provide a diagnosis — consult a qualified clinician for medical decisions.';
 
 // ============================================================ THEME
@@ -374,8 +379,8 @@ function setTheme(v) { state.theme = v; localStorage.setItem('hc-theme', v); app
 const SCREENS = {};
 
 SCREENS.today = async () => {
-  const [osRaw, goalsRaw] = await Promise.all([safe('/operating-system'), safe('/health-goals')]);
-  const today = normalizeToday(osRaw || {}, goalsRaw || {});
+  const todayRaw = await safe('/today') || await safe('/os') || {};
+  const today = normalizeToday(todayRaw || {});
   const summary = today.summaryLine || 'Nog geen dagelijkse digest beschikbaar. Zodra er genoeg recente data is, verschijnt hier de briefing.';
   const generated = today.generatedAt ? today.generatedAt.slice(0, 16).replace('T', ' ') : fmtToday();
 
@@ -430,7 +435,7 @@ SCREENS.today = async () => {
   </div>`;
 };
 
-function normalizeToday(os, goalsRaw) {
+function normalizeToday(os, goalsRaw = {}) {
   const digest = os.today || os.digest || os.briefing || os;
   const decision = os.decision_support || os.decisionSupport || {};
   const progress = os.progress || digest.progress || {};
@@ -519,7 +524,7 @@ function todayRecommendation(r) {
       <div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h3>${esc(r.title)}</h3><span class="pill ${cls}">${esc(r.priority || 'normal')}</span></div>
         <p>${esc(r.message || 'Geen detailtekst beschikbaar.')}</p>
         <div class="today-rec-actions">
-          ${Object.entries(ACTION_LABELS).map(([status, label]) => `<button class="btn sm ${status === 'done' ? 'primary' : ''}" data-rec-action="${status}" data-rec-key="${esc(key)}">${icon(status === 'done' ? 'check' : status === 'dismissed' ? 'close' : status === 'snoozed' ? 'clock' : 'info', 13)}${label}</button>`).join('')}
+          ${Object.entries(ACTIONS).map(([action, cfg]) => `<button class="btn sm ${action === 'done' ? 'primary' : ''}" data-rec-action="${action}" data-rec-key="${esc(key)}">${icon(cfg.icon, 13)}${cfg.label}</button>`).join('')}
         </div>
         <div class="meta today-rec-msg" aria-live="polite"></div>
       </div>
@@ -1073,19 +1078,20 @@ async function labReviewAction(id, status) {
 }
 
 async function todayRecommendationAction(button) {
-  const status = button.dataset.recAction;
+  const action = button.dataset.recAction;
+  const cfg = ACTIONS[action];
   const recKey = button.dataset.recKey;
   const card = button.closest('.today-rec');
   const msg = card?.querySelector('.today-rec-msg');
-  if (!status || !recKey) return;
-  const payload = { status };
-  if (status === 'snoozed') payload.snooze_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  if (!cfg || !recKey) return;
+  const payload = { status: cfg.status };
+  if (action === 'snooze') payload.snooze_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   button.disabled = true;
   if (msg) msg.textContent = 'Actie opslaan...';
   try {
     await postJSON(`/recommendations/${recKey}/action`, payload);
-    cache.delete('/operating-system');
-    cache.delete('/health-goals');
+    cache.delete('/today');
+    cache.delete('/os');
     if (card) card.remove();
     const list = document.getElementById('today-rec-list');
     const count = document.getElementById('today-rec-count');

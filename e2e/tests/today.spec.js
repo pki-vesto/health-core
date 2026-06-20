@@ -33,11 +33,8 @@ const populatedToday = {
 };
 
 async function mockToday(page, body) {
-  await page.route('**/api/v1/operating-system', async (route) => {
+  await page.route('**/api/v1/today', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
-  });
-  await page.route('**/api/v1/health-goals', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ goals: [] }) });
   });
 }
 

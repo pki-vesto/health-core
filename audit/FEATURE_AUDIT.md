@@ -2263,7 +2263,7 @@ The audit uses code/schema/API/runtime evidence. It does not treat documentation
     "domain_title": "Health OS briefings",
     "title": "Function as personal Health Operating System",
     "classification": "complete",
-    "code_evidence": "GET /operating-system + Today UI digest/actions",
+    "code_evidence": "GET /today + Today UI digest/actions",
     "reason": "Code contains an API contract and a visible Today workflow for digest, recommendation lifecycle actions, goal progress, streaks and disclaimer; Playwright covers the surface."
   }
 ]

@@ -156,8 +156,9 @@ not included in the prompt text and are not invented by the implementation.
 - `GET /api/v1/milestones` — persisted health milestones.
 - `GET /api/v1/progress` — progress monitoring.
 - `GET /api/v1/decision-support` — informational decision support.
-- `GET /api/v1/operating-system` — combined personal Health Operating System
-  projection.
+- `GET /api/v1/today` (alias: `/api/v1/os`, legacy:
+  `/api/v1/operating-system`) — combined personal Health Operating System
+  projection for the Today UI.
 
 ## Write / Ingest (v1)
 

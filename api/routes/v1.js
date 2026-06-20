@@ -156,6 +156,12 @@ v1.get('/progress', h((_req, res) => {
 v1.get('/decision-support', h((_req, res) => {
   res.json(hos.decisionSupport(db()));
 }));
+v1.get('/today', h((_req, res) => {
+  res.json(hos.operatingSystem(db()));
+}));
+v1.get('/os', h((_req, res) => {
+  res.json(hos.operatingSystem(db()));
+}));
 v1.get('/operating-system', h((_req, res) => {
   res.json(hos.operatingSystem(db()));
 }));
