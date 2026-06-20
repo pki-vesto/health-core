@@ -142,10 +142,10 @@ function analysisFor(database, experiment) {
 
 function windowStats(database, metric, from, to) {
   const rows = database.prepare(`
-    SELECT timestamp, AVG(value) AS value
+    SELECT date(timestamp) AS timestamp, AVG(value) AS value
       FROM observations
-     WHERE metric_type = ? AND timestamp BETWEEN ? AND ?
-     GROUP BY timestamp
+     WHERE metric_type = ? AND date(timestamp) BETWEEN ? AND ?
+     GROUP BY date(timestamp)
      ORDER BY timestamp
   `).all(metric, from, to);
   const values = rows.map(r => Number(r.value)).filter(Number.isFinite);

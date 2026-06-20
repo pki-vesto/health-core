@@ -7,13 +7,51 @@
 import { fileURLToPath } from 'node:url';
 import { rmSync } from 'node:fs';
 import express from 'express';
-import { buildDb, harness, seedDaily } from './fixtures.mjs';
+import { buildDb, harness, insertObs, seedDaily } from './fixtures.mjs';
 
 async function boot() {
   const tmp = buildDb();
   const path = tmp.__path;
   seedDaily(tmp, 'sleep.duration', '2026-01-01', [7, 8, 9]);
   seedDaily(tmp, 'sleep.duration', '2026-01-10', [8, 9, 10]);
+  insertObs(tmp, {
+    metric: 'sleep.duration',
+    date: '2026-03-01',
+    value: 6,
+    externalId: 'manual:sleep.duration:datetime-baseline-1'
+  });
+  insertObs(tmp, {
+    metric: 'sleep.duration',
+    date: '2026-03-02',
+    value: 7,
+    externalId: 'manual:sleep.duration:datetime-baseline-2'
+  });
+  insertObs(tmp, {
+    metric: 'sleep.duration',
+    date: '2026-03-03T23:30:00.000Z',
+    value: 8,
+    externalId: 'manual:sleep.duration:datetime-baseline-3',
+    sourceUpdatedAt: '2026-03-03T23:30:00.000Z'
+  });
+  insertObs(tmp, {
+    metric: 'sleep.duration',
+    date: '2026-03-10',
+    value: 8,
+    externalId: 'manual:sleep.duration:datetime-test-1'
+  });
+  insertObs(tmp, {
+    metric: 'sleep.duration',
+    date: '2026-03-11',
+    value: 9,
+    externalId: 'manual:sleep.duration:datetime-test-2'
+  });
+  insertObs(tmp, {
+    metric: 'sleep.duration',
+    date: '2026-03-12T23:30:00.000Z',
+    value: 10,
+    externalId: 'manual:sleep.duration:datetime-test-3',
+    sourceUpdatedAt: '2026-03-12T23:30:00.000Z'
+  });
   seedDaily(tmp, 'heart.hrv_sdnn', '2026-02-01', [50, 51]);
   seedDaily(tmp, 'heart.hrv_sdnn', '2026-02-10', [55, 56, 57]);
   const obsBefore = tmp.prepare('SELECT COUNT(*) AS n FROM observations').get().n;
@@ -108,6 +146,30 @@ export async function run() {
 
     const rerun = await fetch(`${base}/experiments/${id}/analysis`).then(r => r.json());
     t.eq('GET /experiments/:id/analysis recomputes deterministically', rerun.result.delta, 1);
+
+    const datetimeWindow = await post(base, {
+      hypothesis: 'Datetime observations on end dates count',
+      intervention: 'Keep the same sleep opportunity',
+      metric_type: 'sleep.duration',
+      baseline_start: '2026-03-01',
+      baseline_end: '2026-03-03',
+      test_start: '2026-03-10',
+      test_end: '2026-03-12'
+    });
+    const datetimeResult = await fetch(`${base}/experiments/${datetimeWindow.json.experiment.id}/analysis`).then(r => r.json());
+    t.eq('analysis includes end-date observations with timestamp time components',
+      {
+        status: datetimeResult.result.status,
+        baseline: datetimeResult.result.baseline,
+        test: datetimeResult.result.test,
+        delta: datetimeResult.result.delta
+      },
+      {
+        status: 'sufficient',
+        baseline: { from: '2026-03-01', to: '2026-03-03', n: 3, mean: 7 },
+        test: { from: '2026-03-10', to: '2026-03-12', n: 3, mean: 9 },
+        delta: 2
+      });
 
     const insufficient = await post(base, {
       hypothesis: 'Short HRV trial',
