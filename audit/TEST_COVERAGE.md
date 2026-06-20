@@ -1,6 +1,6 @@
 # Health Core Test Coverage
 
-Date: 2026-06-09
+Date: 2026-06-18
 
 ## Offline unit/fixture suite — `api/test/unit.mjs`
 
@@ -24,9 +24,11 @@ Suites (all green):
 - `decision-support.test.mjs` — informational/non-clinical wording invariants.
 - `track.test.mjs` — tracking correction semantics (stable id + LWW).
 - `milestones.test.mjs` — record, biomarker-range and logging-streak milestone detection plus idempotent writes.
+- `domain-fixtures.test.mjs` — proves `seedAllDomains()` covers domains 1-25, every active metric, representative capability tables, sparse/incomplete edge cases and deterministic output.
 
 Also: `api/test/ingest.mjs` (temp-DB ingest integration) and `api/test/fixtures.mjs`
-(+ `seed-domains.mjs`) shared harness/fixtures.
+(+ `seed-domains.mjs`) shared harness/fixtures. The domain seeder now has an
+explicit `DOMAIN_FIXTURE_COVERAGE` manifest for all registered domains.
 
 ## Live-server tests
 

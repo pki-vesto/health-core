@@ -78,6 +78,7 @@ Date: 2026-06-09
   generators via `writeDb()`, dedupe-by-day on `(period, payload_sha256,
   substr(generated_at,1,10))`; `brief.generated_at` is built in Europe/Amsterdam
   so day-bucketing is timezone-correct across midnight UTC.
+
 - `api/lib/briefing-diff.js` — pure `diffBriefings(prev, next)` returning
   `{ first, summary, highlights, alerts, decisions }` with added/removed/changed.
 - New `api/routes/briefing.js` mounts `GET /briefing/history`, `/briefing/:id`,
@@ -88,6 +89,17 @@ Date: 2026-06-09
   no-prior diff). `migration.test.mjs` now requires `briefing_snapshots`.
 - `unit.mjs` now awaits suite results so the async HTTP route suite can join the
   aggregate run. Full suite green (16/16). Governance + schema drift clean.
+
+## 2026-06-18 — Domain fixture expansion (issue #3)
+
+- Expanded `api/test/seed-domains.mjs` with an explicit `DOMAIN_FIXTURE_COVERAGE`
+  manifest for all 25 registered domains.
+- Seeded every active metric, including previously uncovered score/baseline
+  metrics, plus representative experiments, ingest/quarantine, derived metrics,
+  milestones, insight history, briefing snapshots and user health goals.
+- Added `api/test/domain-fixtures.test.mjs` to prove domain coverage, active
+  metric coverage, sparse lab data, incomplete quarantine input and deterministic
+  fixture output.
 
 ## 2026-06-15 — User-defined health goals & targets (issue #34)
 
