@@ -372,6 +372,13 @@ body {
 .report-thumb { width: 46px; height: 58px; border-radius: 8px; flex: 0 0 auto; background: linear-gradient(160deg, var(--surface-2), var(--surface)); border: 1px solid var(--line); display: grid; place-items: center; color: var(--accent); box-shadow: var(--shadow-sm); }
 .report-cover { border-radius: var(--r-lg); padding: 26px 24px; background: radial-gradient(120% 130% at 90% 0%, color-mix(in srgb, var(--accent) 55%, #1d3a32), transparent 70%), linear-gradient(150deg, #2f5145, #1c332c); display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 [data-theme="dark"] .report-cover { background: radial-gradient(120% 130% at 90% 0%, color-mix(in srgb, var(--accent) 40%, #16241f), transparent 70%), linear-gradient(150deg, #1f3a32, #15211c); }
+@media print {
+  .sidebar, .topbar, .mobile-top, .bottom-nav, .sheet-head, .no-print { display: none !important; }
+  .sheet-backdrop { position: static; background: #fff; padding: 0; }
+  .sheet { max-width: none; width: 100%; height: auto; box-shadow: none; border: 0; border-radius: 0; }
+  .sheet-body { padding: 0; max-height: none; overflow: visible; }
+  .report-cover { border-radius: 0; }
+}
 
 .empty { padding: 30px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: var(--r-md); background: var(--surface); }
 .future { border-style: dashed; text-align: center; padding: 34px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; }

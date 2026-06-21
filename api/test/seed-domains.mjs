@@ -7,6 +7,34 @@
 //   const db = seedAllDomains(buildDb(), { to: '2026-03-01', days: 60 });
 import { insertObs, addDays } from './fixtures.mjs';
 
+export const DOMAIN_FIXTURE_COVERAGE = [
+  { domain: 1, title: 'Platform foundation', metrics: ['body.weight'], tables: ['sources', 'metric_types'] },
+  { domain: 2, title: 'Apple Health integration', metrics: ['heart.resting_rate', 'heart.hrv_sdnn', 'fitness.vo2max', 'sleep.duration', 'activity.steps'] },
+  { domain: 3, title: 'Dashboard foundation', metrics: ['body.weight', 'fitness.session_volume', 'nutrition.calories', 'sleep.duration'] },
+  { domain: 4, title: 'Training analytics', metrics: ['fitness.session_volume', 'score.training_load'] },
+  { domain: 5, title: 'Nutrition analytics', metrics: ['nutrition.calories', 'nutrition.protein', 'nutrition.carbs', 'nutrition.fat', 'score.nutrition_consistency'] },
+  { domain: 6, title: 'Recovery analytics', metrics: ['heart.hrv_sdnn', 'sleep.duration', 'score.recovery'] },
+  { domain: 7, title: 'Correlation engine', metrics: ['body.weight', 'nutrition.calories', 'fitness.session_volume'] },
+  { domain: 8, title: 'Experiment framework', metrics: ['body.weight'], tables: ['experiments'] },
+  { domain: 9, title: 'Predictive intelligence', metrics: ['body.weight', 'fitness.vo2max', 'score.training_response'] },
+  { domain: 10, title: 'Product maturity', metrics: ['score.health_operating_system'], tables: ['ingest_log', 'quarantine'] },
+  { domain: 11, title: 'Biomarkers', metrics: ['blood.apob', 'blood.glucose', 'blood.crp'] },
+  { domain: 12, title: 'Bloodwork', metrics: ['blood.total_cholesterol', 'blood.ldl_cholesterol', 'blood.hdl_cholesterol', 'blood.triglycerides'] },
+  { domain: 13, title: 'Stress intelligence', metrics: ['stress.perceived', 'score.stress', 'score.cardiometabolic'] },
+  { domain: 14, title: 'Mood and wellbeing', metrics: ['mood.valence', 'mood.energy', 'mood.motivation', 'score.mood'] },
+  { domain: 15, title: 'Symptoms', metrics: ['symptom.severity', 'score.symptom_burden'] },
+  { domain: 16, title: 'Body composition', metrics: ['body.fat_percent', 'body.muscle_mass', 'body.lean_mass', 'body.visceral_fat', 'body.water_percent'] },
+  { domain: 17, title: 'Sleep 2.0', metrics: ['sleep.deep', 'sleep.rem', 'sleep.light', 'sleep.awake', 'sleep.bedtime', 'sleep.wake_time', 'score.sleep_quality'] },
+  { domain: 18, title: 'Nutrition 2.0', metrics: ['nutrition.fiber', 'nutrition.sodium', 'nutrition.water', 'nutrition.micronutrient_index', 'nutrition.meal_timing_score', 'score.nutrition_quality'] },
+  { domain: 19, title: 'Recovery 2.0', metrics: ['score.recovery', 'score.fatigue', 'baseline.recovery'] },
+  { domain: 20, title: 'Training 2.0', metrics: ['score.training_response', 'baseline.training'] },
+  { domain: 21, title: 'Longitudinal intelligence', metrics: ['body.weight'], tables: ['health_milestones'] },
+  { domain: 22, title: 'Personal baselines', metrics: ['baseline.hrv', 'baseline.sleep', 'baseline.weight', 'baseline.recovery', 'baseline.training'] },
+  { domain: 23, title: 'Risk detection', metrics: ['score.risk', 'blood.glucose', 'blood.hba1c', 'score.stress'] },
+  { domain: 24, title: 'Insights engine', metrics: ['score.risk', 'score.recovery'], tables: ['insight_events'] },
+  { domain: 25, title: 'Health OS briefings', metrics: ['score.health_operating_system'], tables: ['briefing_snapshots', 'user_health_goals'] }
+];
+
 // Generate `days` daily values v(i) = base + trend*i + amp*sin(i/period),
 // clamped to >=min, rounded. Smooth + deterministic.
 function curve({ base, amp = 0, trend = 0, period = 7, days, min = null, round = 2 }) {
@@ -96,7 +124,107 @@ export function seedAllDomains(db, { to = null, days = 60 } = {}) {
   series(db, 'score.training_response', T, { base: 60, amp: 15, days });
   series(db, 'score.stress', T, { base: 50, amp: 18, days });
 
+  // Cross-domain score/baseline metrics that are active vocabulary but were not
+  // tied to a single raw ingest stream. They keep fixture audits complete while
+  // remaining deterministic and visibly derived via the health_core source.
+  series(db, 'score.training_load', T, { base: 62, amp: 12, days }, { source: 'health_core' });
+  series(db, 'score.nutrition_consistency', T, { base: 74, amp: 9, days }, { source: 'health_core' });
+  series(db, 'score.health_operating_system', T, { base: 82, amp: 4, trend: 0.03, days }, { source: 'health_core' });
+  series(db, 'score.cardiometabolic', T, { base: 78, amp: 6, days }, { source: 'health_core' });
+  series(db, 'score.mood', T, { base: 64, amp: 14, days }, { source: 'health_core' });
+  series(db, 'score.symptom_burden', T, { base: 26, amp: 12, days, min: 0 }, { source: 'health_core' });
+  series(db, 'score.sleep_quality', T, { base: 71, amp: 11, days }, { source: 'health_core' });
+  series(db, 'score.nutrition_quality', T, { base: 76, amp: 8, days }, { source: 'health_core' });
+  series(db, 'score.risk', T, { base: 22, amp: 16, days, min: 0 }, { source: 'health_core' });
+  series(db, 'baseline.hrv', T, { base: 63, amp: 2, days }, { source: 'health_core' });
+  series(db, 'baseline.sleep', T, { base: 7.4, amp: 0.15, days }, { source: 'health_core' });
+  series(db, 'baseline.weight', T, { base: 82, amp: 0.2, trend: -0.01, days }, { source: 'health_core' });
+  series(db, 'baseline.recovery', T, { base: 69, amp: 4, days }, { source: 'health_core' });
+  series(db, 'baseline.training', T, { base: 61, amp: 5, days }, { source: 'health_core' });
+
+  // Domain 21 — long-range context and milestones. Add an older point so
+  // longitudinal windows have a prior year to compare, plus milestone rows.
+  insertObs(db, { metric: 'body.weight', date: addDays(T, -365), value: 86.4, source: 'manual', externalId: 'fixture:longitudinal:body.weight' });
+
+  seedTableFixtures(db, T);
+
   return db;
 }
 
 export default seedAllDomains;
+
+function seedTableFixtures(db, T) {
+  db.prepare(`
+    INSERT INTO experiments
+      (hypothesis, intervention, reversible, design, metric_type, baseline_start, baseline_end, test_start, test_end, status, result)
+    VALUES
+      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'Earlier caffeine improves HRV baseline',
+    'No caffeine after 12:00',
+    1,
+    'single',
+    'heart.hrv_sdnn',
+    addDays(T, -56),
+    addDays(T, -43),
+    addDays(T, -42),
+    addDays(T, -29),
+    'concluded',
+    JSON.stringify({ outcome: 'positive', delta: 4.2 })
+  );
+
+  db.prepare(`
+    INSERT INTO ingest_log
+      (received_at, source, format, status, records_in, records_written, records_quarantined, payload_sha256, payload, error)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(`${T}T08:00:00Z`, 'apple_health', 'apple_health', 'partial', 5, 4, 1, 'f'.repeat(64), '{"fixture":true}', 'one incomplete fixture record');
+  const ingestId = Number(db.prepare('SELECT last_insert_rowid() AS id').get().id);
+  db.prepare(`
+    INSERT INTO quarantine (ingest_id, source, raw_record, reason, resolved)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(ingestId, 'apple_health', '{"metric":"activity.steps","timestamp":null,"value":9000}', 'missing timestamp', 0);
+
+  db.prepare(`
+    INSERT INTO derived_metrics (metric_type, timestamp, value, unit, formula_version, inputs)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run('score.recovery', T, 72, 'score', 'fixture_recovery_score_v1', JSON.stringify(['heart.hrv_sdnn', 'sleep.duration', 'heart.resting_rate']));
+
+  const milestoneRows = [
+    [addDays(T, -45), 'record_low', 'Lowest fixture bodyweight', 'Representative longitudinal bodyweight milestone.', 'body.weight', 81.2],
+    [addDays(T, -12), 'logging_streak', '7-day sleep fixture streak', 'Representative adherence milestone.', 'sleep.duration', 7]
+  ];
+  const insMilestone = db.prepare(`
+    INSERT INTO health_milestones (timestamp, category, title, detail, metric_type, value)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  for (const row of milestoneRows) insMilestone.run(...row);
+
+  const insightRows = [
+    ['risk', 'Glucose trend requires attention', 'Fixture risk signal from rising glucose.', 80, 72, { metric: 'blood.glucose' }, { window: '60d' }, 'medium'],
+    ['recovery', 'Recovery capacity is improving', 'Fixture recovery signal from HRV and sleep.', 65, 76, { metric: 'score.recovery' }, { window: '60d' }, 'low']
+  ];
+  const insInsight = db.prepare(`
+    INSERT INTO insight_events (category, title, summary, impact, confidence, evidence, source_data, uncertainty)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const row of insightRows) {
+    insInsight.run(row[0], row[1], row[2], row[3], row[4], JSON.stringify(row[5]), JSON.stringify(row[6]), row[7]);
+  }
+
+  const insBriefing = db.prepare(`
+    INSERT INTO briefing_snapshots (period, generated_at, payload, payload_sha256, summary)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  const dailyPayload = JSON.stringify({ period: 'daily', generated_at: `${T}T07:00:00+01:00`, summary: { fixture: true } });
+  const weeklyPayload = JSON.stringify({ period: 'weekly', generated_at: `${T}T07:05:00+01:00`, summary: { fixture: true, weekly: true } });
+  insBriefing.run('daily', `${T}T07:00:00+01:00`, dailyPayload, 'a'.repeat(64), '{"fixture":true}');
+  insBriefing.run('weekly', `${T}T07:05:00+01:00`, weeklyPayload, 'b'.repeat(64), '{"fixture":true,"weekly":true}');
+
+  const insGoal = db.prepare(`
+    INSERT INTO user_health_goals
+      (metric_key, comparator, target_value, target_low, target_high, window, deadline, status, label)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  insGoal.run('body.weight', 'lte', 80, null, null, '90d', addDays(T, 60), 'active', 'Cut target');
+  insGoal.run('heart.hrv_sdnn', 'gte', 60, null, null, '30d', null, 'paused', 'Recovery floor');
+}

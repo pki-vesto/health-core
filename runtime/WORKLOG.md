@@ -78,6 +78,7 @@ Date: 2026-06-09
   generators via `writeDb()`, dedupe-by-day on `(period, payload_sha256,
   substr(generated_at,1,10))`; `brief.generated_at` is built in Europe/Amsterdam
   so day-bucketing is timezone-correct across midnight UTC.
+
 - `api/lib/briefing-diff.js` — pure `diffBriefings(prev, next)` returning
   `{ first, summary, highlights, alerts, decisions }` with added/removed/changed.
 - New `api/routes/briefing.js` mounts `GET /briefing/history`, `/briefing/:id`,
@@ -101,6 +102,55 @@ Date: 2026-06-09
   from the active list without a full page reload.
 - Added scoped Today UI styling plus Playwright coverage for digest rendering,
   action removal, goal progress and empty states.
+## 2026-06-18 — Domain fixture expansion (issue #3)
+
+- Expanded `api/test/seed-domains.mjs` with an explicit `DOMAIN_FIXTURE_COVERAGE`
+  manifest for all 25 registered domains.
+- Seeded every active metric, including previously uncovered score/baseline
+  metrics, plus representative experiments, ingest/quarantine, derived metrics,
+  milestones, insight history, briefing snapshots and user health goals.
+- Added `api/test/domain-fixtures.test.mjs` to prove domain coverage, active
+  metric coverage, sparse lab data, incomplete quarantine input and deterministic
+  fixture output.
+
+## 2026-06-15 — User-defined health goals & targets (issue #34)
+
+- Additive migration `010_user_health_goals.sql` adds `user_health_goals`
+  (id/metric_key→metric_types(key)/comparator∈{lte,gte,eq,range}/target_value/
+  target_low/target_high/window/deadline/status∈{active,paused,achieved,retired}/
+  label/created_at/updated_at) plus two indexes (status, metric_key). Distinct
+  from the legacy `health_goals` 1-250 dev registry — that table and its
+  surfaces (`/api/v1/goals`, `/progress`) are untouched. `schema.sql` regenerated
+  (16 tables, 12 indexes).
+- New router `api/routes/user-goals.js` mounts under `/api/v1/user-goals`:
+  - `POST /user-goals` (create; validates metric_key exists in `metric_types`
+    with a clean `unknown_metric_key` 400 instead of a FK-violation 500;
+    enforces comparator/value-field shape — `range` requires low+high and
+    rejects target_value; `lte|gte|eq` require target_value and reject
+    low/high; range needs low ≤ high; deadline must be a real ISO date
+    `YYYY-MM-DD` — owner-facing day precision, Europe/Amsterdam calendar).
+  - `GET /user-goals?status=…` (filter; DESC by created_at).
+  - `GET /user-goals/:id` (404 on missing; 400 on non-integer id).
+  - `PATCH /user-goals/:id` (partial; merged row re-validated so a comparator
+    switch revalidates value fields; touches `updated_at`; never deletes —
+    retire/pause is a status change).
+- `api/db.js`: resolved `CORE_DB` per open instead of at module load, plus a
+  test-only `__resetForTests()` helper, so the unit aggregator can boot
+  multiple Express route suites in one process without singletons stuck on a
+  previous suite's now-unlinked temp DB. No production behaviour change
+  (`CORE_DB` is set once at process start in prod).
+- Server mounts `userGoals` on `/api/v1` so it lives under the same bearer-auth
+  gate as the rest of the data API.
+- Tests: new `api/test/user-goals.test.mjs` (41 assertions) covering create per
+  comparator, unknown metric_key, missing/inconsistent target fields, invalid
+  comparator/status/deadline, list (with/without filter), get-by-id, PATCH
+  (label/target_value/status churn including round-trip back to active without
+  row deletion, comparator switch revalidation, empty body), legacy
+  `/api/v1/goals` and `/progress` regression guard, and migration idempotency.
+  Aggregator (`api/test/unit.mjs`) registers the new suite. `migration.test.mjs`
+  now requires `user_health_goals` in the bootstrap table set. Full suite green
+  (17 suites). Governance + schema drift clean. Predeploy `node scripts/check.mjs`
+  passes.
 
 ## Still Open
 

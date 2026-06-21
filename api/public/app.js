@@ -1020,9 +1020,18 @@ async function reportPreview(period) {
   const s = (b && b.summary) || {};
   const kpis = [['Herstel', s.recovery != null ? Math.round(s.recovery) : '—'], ['Belasting', s.training_load != null ? Math.round(s.training_load) : '—'], ['Voeding', s.nutrition_consistency != null ? Math.round(s.nutrition_consistency) : '—'], ['Signalen', b && b.alerts ? b.alerts.length : 0]];
   const decisions = (b && b.decisions) || [];
+  const fullReport = period === 'quarterly' || period === 'yearly';
+  const highlights = (b && b.highlights) || [];
+  const alerts = (b && b.alerts) || [];
+  const exportName = `health-core-${period}-briefing.json`;
   return `<div class="report-cover"><div><div class="eyebrow" style="color:rgba(255,255,255,0.7)">${esc(label)}rapport</div><h1 style="font-size:27px;font-weight:750;letter-spacing:-0.02em;margin:10px 0 0;color:#fff;line-height:1.15">Health Core ${esc(label)}</h1><div style="margin-top:16px;font-size:13px;color:rgba(255,255,255,0.8)">${b ? esc(b.generated_at ? b.generated_at.slice(0, 10) : '') : ''}</div></div><span class="brand-mark" style="width:38px;height:38px">${icon('pulse', 18)}</span></div>
-    <div style="padding:20px 2px 0"><h3 style="font-size:14px;font-weight:700;margin:0 0 8px">Samenvatting</h3><p class="briefing" style="font-size:14.5px;margin:0 0 18px">${b ? esc(briefSummaryLine(b)) : 'Niet beschikbaar.'} Dit rapport bundelt je belangrijkste signalen over de periode en plaatst ze tegen je persoonlijke baselines.</p>
+    <div class="report-body" data-report-period="${esc(period)}" style="padding:20px 2px 0">
+      ${fullReport ? `<div class="report-actions no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"><button class="btn sm" data-print-report>${icon('doc', 14)}Print rapport</button><a class="btn sm" href="${API}/briefing/${esc(period)}" download="${esc(exportName)}">${icon('download', 14)}Exporteer JSON</a></div>` : ''}
+      <h3 style="font-size:14px;font-weight:700;margin:0 0 8px">Samenvatting</h3><p class="briefing" style="font-size:14.5px;margin:0 0 18px">${b ? esc(briefSummaryLine(b)) : 'Niet beschikbaar.'} Dit rapport bundelt je belangrijkste signalen over de periode en plaatst ze tegen je persoonlijke baselines.</p>
       <div class="cols-4" style="margin-bottom:20px">${kpis.map(([l, v]) => `<div class="card" style="padding:13px"><span class="lab" style="font-size:11px;color:var(--ink-3);font-weight:600">${l}</span><div class="metric-val" style="font-size:19px;margin-top:4px">${v}</div></div>`).join('')}</div>
+      ${fullReport ? `<h3 style="font-size:14px;font-weight:700;margin:0 0 8px">Belangrijkste signalen</h3><div class="grid" style="gap:8px;margin-bottom:18px">${highlights.length ? highlights.map((h) => `<div class="card" style="padding:12px"><div style="font-size:13.5px;font-weight:650">${esc(h.title || h.label || 'Signaal')}</div><div class="meta" style="margin-top:3px">${esc(h.subtitle || h.detail || h.status || '')}</div></div>`).join('') : '<div class="card" style="padding:12px"><div class="meta">Geen opvallende highlights in deze periode.</div></div>'}</div>
+      <h3 style="font-size:14px;font-weight:700;margin:0 0 8px">Risico's en opvolging</h3><div class="grid" style="gap:8px;margin-bottom:18px">${alerts.length ? alerts.map((a) => `<div class="card" style="padding:12px;display:flex;gap:10px;align-items:flex-start"><span class="insight-ic warn" style="width:28px;height:28px">${icon('alert', 14)}</span><div><div style="font-size:13.5px;font-weight:650">${esc(a.title || a.message || 'Aandachtspunt')}</div><div class="meta" style="margin-top:3px">${esc(a.detail || a.metric || '')}</div></div></div>`).join('') : '<div class="card" style="padding:12px"><div class="meta">Geen alarmsignalen in deze periode.</div></div>'}</div>
+      <h3 style="font-size:14px;font-weight:700;margin:0 0 8px">Metadata</h3><div class="card" style="padding:12px;margin-bottom:18px"><div class="meta">Periode: ${esc(label)} · Snapshot: ${b && b.snapshot_id ? `#${b.snapshot_id}` : 'niet vastgelegd'} · Dedupe: ${b && b.deduped ? 'ja' : 'nee'}</div></div>` : ''}
       ${decisions.length ? `<h3 style="font-size:14px;font-weight:700;margin:0 0 8px">Kernpunten</h3><ol style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:9px">${decisions.map((d) => `<li style="font-size:13.5px;line-height:1.5;color:var(--ink-2)">${esc(d.message || '')}</li>`).join('')}</ol>` : '<p class="muted">Geen specifieke aandachtspunten in deze periode.</p>'}
       ${b && b.disclaimer ? `<p class="meta" style="font-size:11.5px;margin-top:18px;line-height:1.5">${esc(b.disclaimer)}</p>` : ''}
     </div>`;
@@ -1181,7 +1190,7 @@ function invalidateAfterTrack(metric) {
 
 // ============================================================ EVENT DELEGATION
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-nav],[data-theme-toggle],[data-open-insight],[data-insights-filter],[data-trends-range],[data-trends-metric],[data-exp-tab],[data-health-tab],[data-more],[data-close-sheet],[data-open-report],[data-set-theme],[data-set-accent],[data-set-density],[data-set-font],[data-lab-parse],[data-lab-commit],[data-lab-review-id],[data-track-submit],[data-rec-action]');
+  const t = e.target.closest('[data-nav],[data-theme-toggle],[data-open-insight],[data-insights-filter],[data-trends-range],[data-trends-metric],[data-exp-tab],[data-health-tab],[data-more],[data-close-sheet],[data-open-report],[data-print-report],[data-set-theme],[data-set-accent],[data-set-density],[data-set-font],[data-lab-parse],[data-lab-commit],[data-lab-review-id],[data-track-submit],[data-rec-action]');
   if (!t) return;
   if (t.dataset.nav != null) return nav(t.dataset.nav, { metric: t.dataset.metric });
   if (t.dataset.themeToggle != null) return setTheme(state.theme === 'dark' ? 'light' : 'dark');
@@ -1194,6 +1203,7 @@ document.addEventListener('click', (e) => {
   if (t.dataset.more != null) return openSheet(moreSheet(), 'Alle secties');
   if (t.dataset.closeSheet != null) return closeSheet();
   if (t.dataset.openReport != null) { openSheet('<div class="empty">Rapport laden…</div>'); reportPreview(t.dataset.openReport).then((h) => { const s = document.querySelector('#sheet .sheet-body'); if (s) s.innerHTML = h; }); return; }
+  if (t.dataset.printReport != null) return window.print();
   if (t.dataset.setTheme != null) return setTheme(t.dataset.setTheme);
   if (t.dataset.setAccent != null) { state.accent = t.dataset.setAccent; localStorage.setItem('hc-accent', state.accent); applyTheme(); return renderScreen(); }
   if (t.dataset.setDensity != null) { state.density = t.dataset.setDensity; localStorage.setItem('hc-density', state.density); applyTheme(); return renderScreen(); }

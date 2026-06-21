@@ -28,6 +28,7 @@ const REQUIRED_TABLES = [
   'ingest_log', 'quarantine', 'health_goals', 'biomarker_registry',
   'biomarker_reference_ranges', 'lab_results', 'insight_events',
   'health_milestones', 'symptom_categories', 'briefing_snapshots',
+  'user_health_goals',
   'recommendation_actions'
 ];
 
