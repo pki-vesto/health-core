@@ -40,6 +40,14 @@ Date: 2026-06-09
   computing RHR locally for fatigue scoring; high recovery warnings and
   overtraining are now reachable in `api/test/platform.test.mjs`.
 
+## 2026-06-20 — Forecast uncertainty and backtest hardening
+
+- Extended `GET /api/v1/predictions` forecast math with R2, residual standard
+  error, fit quality, fit-derived confidence and a documented approximate 95%
+  residual-error interval (`next +/- 1.96 * residual_std`).
+- Added an opt-in `backtest=1` hold-out tail accuracy field plus deterministic
+  math tests for perfect, noisy, constant, sparse and backtested series.
+
 ## 2026-06-09 — UI redesign ("Personal Health OS", Claude Design handoff)
 
 - Implemented the Claude Design handoff (`Health Core.html` + bundle) as a full
@@ -151,6 +159,27 @@ Date: 2026-06-09
   now requires `user_health_goals` in the bootstrap table set. Full suite green
   (17 suites). Governance + schema drift clean. Predeploy `node scripts/check.mjs`
   passes.
+
+## 2026-06-20 — Experiment lifecycle write path (issue #27)
+
+- Added `api/lib/experiments.js` for experiment validation, create, status
+  changes, persisted analysis, and deterministic baseline/test verdicts.
+  Metrics must exist in `metric_types`; windows are real `YYYY-MM-DD` dates;
+  statuses are `planned|active|concluded|abandoned`.
+- Added `api/routes/experiments.js`, mounted under `/api/v1`, with
+  `GET/POST /experiments`, `GET /experiments/:id`,
+  `PATCH /experiments/:id`, and `GET /experiments/:id/analysis`. Writes use
+  `writeDb()` and analysis only reads `observations`; verdicts are stored in
+  `experiments.result`.
+- Updated `api/public/app.js` so the Experimenten view can create experiments,
+  start/conclude/abandon them, and display stored sufficient or insufficient
+  verdicts. Existing readiness data remains available for candidate metrics.
+- Tests: added `api/test/experiments.test.mjs` and registered it in
+  `api/test/unit.mjs`. Verification run:
+  `NODE_MODULES_BASE=$PWD/node_modules/noop.js node test/experiments.test.mjs`
+  (18 passed) and
+  `NODE_MODULES_BASE=$PWD/node_modules/noop.js node test/unit.mjs`
+  (0 failed across 20 suites).
 
 ## Still Open
 

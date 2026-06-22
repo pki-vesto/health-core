@@ -115,7 +115,11 @@ All intelligence routes are read-only projections over `observations`.
 - `GET /api/v1/experiments/readiness` — existing experiments plus metrics with
   enough data for single-user baseline/test experiments.
 - `GET /api/v1/predictions?days=90&horizon=14&metrics=a,b` — transparent local
-  linear forecasts; metrics with insufficient data are omitted.
+  linear forecasts; metrics with insufficient data are omitted. Forecasts include
+  `next`, `slope_per_day`, fit-derived `confidence`, `fit_quality`, `r2`,
+  `residual_std`, and an approximate 95% residual-error interval
+  (`next +/- 1.96 * residual_std`). Add `backtest=1` to include hold-out tail
+  accuracy (`count`, `mae`, `mean_error`) per forecast.
 - `GET /api/v1/product/status` — maturity/status view, system counts and
   architecture invariants.
 

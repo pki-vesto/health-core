@@ -19,6 +19,7 @@ import { milestones } from './routes/milestones.js';
 import { briefing } from './routes/briefing.js';
 import { userGoals } from './routes/user-goals.js';
 import { recommendations } from './routes/recommendations.js';
+import { experiments } from './routes/experiments.js';
 
 const PORT = parseInt(process.env.PORT || '8090', 10);
 const TOKEN = process.env.CORE_BEARER_TOKEN || '';
@@ -89,6 +90,7 @@ app.use('/api/v1', milestones); // GET /milestones; POST /milestones/detect
 app.use('/api/v1', briefing); // GET /briefing/history, /briefing/:id, /briefing/:id/diff
 app.use('/api/v1', userGoals); // POST/GET/PATCH /user-goals (issue #34); kept namespaced to /user-goals so the dev /goals registry stays untouched
 app.use('/api/v1', recommendations); // POST /recommendations/:rec_key/action; GET /recommendations/actions
+app.use('/api/v1', experiments); // POST/GET/PATCH /experiments; GET /experiments/:id/analysis
 
 // 404 + error handler.
 app.use((req, res) => res.status(404).json({ error: 'not found', path: req.originalUrl }));

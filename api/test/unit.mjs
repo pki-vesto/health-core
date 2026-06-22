@@ -24,6 +24,7 @@ import { run as briefingRoutes } from './briefing-routes.test.mjs';
 import { run as userGoals } from './user-goals.test.mjs';
 import { run as recommendationActions } from './recommendation-actions.test.mjs';
 import { run as domainFixtures } from './domain-fixtures.test.mjs';
+import { run as experiments } from './experiments.test.mjs';
 
 const SUITES = [
   ['intelligence', intelligence],
@@ -44,7 +45,8 @@ const SUITES = [
   ['briefing-routes', briefingRoutes],
   ['user-goals', userGoals],
   ['recommendation-actions', recommendationActions],
-  ['domain-fixtures', domainFixtures]
+  ['domain-fixtures', domainFixtures],
+  ['experiments', experiments]
 ];
 
 let total = 0;

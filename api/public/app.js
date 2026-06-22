@@ -17,6 +17,11 @@ const MONTHS = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', '
 const MONTHS_L = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
 const DAYS_L = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
 const fmtShort = (s) => { const d = new Date(s + 'T00:00:00'); return d.getDate() + ' ' + MONTHS[d.getMonth()]; };
+function addDaysIso(date, n) {
+  const d = new Date(date + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 function amsterdamDate() {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
   const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
@@ -846,22 +851,69 @@ function labReview(p) {
 }
 
 SCREENS.experiments = async () => {
-  const exp = await safe('/experiments/readiness');
-  const experiments = (exp && exp.experiments) || [];
+  const [exp, persisted, catalog] = await Promise.all([safe('/experiments/readiness'), safe('/experiments'), safe('/metrics')]);
+  const experiments = (persisted && persisted.experiments) || (exp && exp.experiments) || [];
+  const metrics = ((catalog && catalog.metrics) || []).filter((m) => m.status === 'active');
   const ready = (exp && exp.candidate_metrics || []).filter((x) => x.ready);
   const notReady = (exp && exp.candidate_metrics || []).filter((x) => !x.ready && x.n > 0).slice(0, 8);
+  const defaultMetric = ready[0]?.key || metrics[0]?.key || 'sleep.duration';
+  const today = state.serverDate || amsterdamDate();
+  const bEnd = addDaysIso(today, -21);
+  const bStart = addDaysIso(bEnd, -13);
+  const tEnd = addDaysIso(today, -1);
+  const tStart = addDaysIso(tEnd, -13);
   return `<div class="page stagger">
     <div class="card raised anim" style="margin-bottom:20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
       <span class="insight-ic good" style="width:36px;height:36px;background:var(--accent-soft);color:var(--accent)">${icon('beaker', 18)}</span>
       <div style="flex:1;min-width:220px"><div class="eyebrow" style="margin-bottom:5px">Experimenten</div><p class="briefing" style="margin:0;font-size:15px">Test gerichte hypotheses op jezelf. Health Core meet het effect tegen je baseline en schat de betrouwbaarheid in.</p></div>
-      <button class="btn primary" disabled title="Binnenkort">${icon('plus', 15)}Nieuw experiment</button>
     </div>
-    ${experiments.length ? `${sectionTitle('Experimenten')}<div class="grid cols-2" style="align-items:start">${experiments.map((x) => `<div class="card"><div style="font-size:15.5px;font-weight:700">${esc(x.hypothesis || 'Experiment')}</div><p class="meta" style="margin:6px 0 0">${esc(x.intervention || '')} · ${esc(x.status)}</p></div>`).join('')}</div>`
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-head" style="margin-bottom:12px"><div><div class="ttl">Nieuw experiment</div><div class="meta">Baseline versus testperiode</div></div><button class="btn primary right" data-exp-create>${icon('plus', 15)}Aanmaken</button></div>
+      <div class="cols-2" style="margin-bottom:12px">
+        <label class="field">Hypothese<input id="exp-hypothesis" placeholder="8h slaap verhoogt mijn HRV" autocomplete="off" /></label>
+        <label class="field">Interventie<input id="exp-intervention" placeholder="Minimaal 8 uur slaapkans" autocomplete="off" /></label>
+      </div>
+      <div class="cols-3">
+        <label class="field">Metric<select id="exp-metric">${metrics.map((m) => `<option value="${esc(m.key)}" ${m.key === defaultMetric ? 'selected' : ''}>${esc(m.display_name || humanMetric(m.key))}</option>`).join('')}</select></label>
+        <label class="field">Baseline start<input id="exp-baseline-start" type="date" value="${esc(bStart)}" /></label>
+        <label class="field">Baseline eind<input id="exp-baseline-end" type="date" value="${esc(bEnd)}" /></label>
+        <label class="field">Test start<input id="exp-test-start" type="date" value="${esc(tStart)}" /></label>
+        <label class="field">Test eind<input id="exp-test-end" type="date" value="${esc(tEnd)}" /></label>
+        <label class="field">Reversibel<select id="exp-reversible"><option value="0">Nee</option><option value="1">Ja</option></select></label>
+      </div>
+      <div id="exp-msg" class="muted" style="font-size:12.5px;margin-top:10px"></div>
+    </div>
+    ${experiments.length ? `${sectionTitle('Experimenten')}<div class="grid cols-2" style="align-items:start">${experiments.map(experimentCard).join('')}</div>`
       : `<div class="card" style="margin-bottom:20px"><div style="display:flex;gap:12px;align-items:flex-start"><span class="insight-ic info">${icon('info', 15)}</span><div><div style="font-weight:650;font-size:13.5px">Nog geen experimenten gestart</div><p class="meta" style="margin:3px 0 0;line-height:1.5">Een experiment vergelijkt een interventie-periode met je baseline. Metrics met genoeg historie zijn klaar om te testen.</p></div></div></div>`}
     ${ready.length ? sectionTitle(`Klaar om te testen · ${ready.length}`) + `<div class="cols-3" style="margin-bottom:20px">${ready.map((x) => `<div class="card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="sdot good"></span><span style="font-size:13.5px;font-weight:650">${esc(x.display_name || humanMetric(x.key))}</span></div><div class="metric-val" style="font-size:20px">${x.n}</div><div class="meta" style="margin-top:3px">datapunten · genoeg voor baseline/test</div></div>`).join('')}</div>` : ''}
     ${notReady.length ? sectionTitle('Meer data nodig') + `<div class="card flush"><table class="tbl"><thead><tr><th>Metric</th><th>Datapunten</th><th>Status</th></tr></thead><tbody>${notReady.map((x) => `<tr><td style="font-weight:600">${esc(x.display_name || humanMetric(x.key))}</td><td class="mono">${x.n}</td><td><span class="pill warn">< 14</span></td></tr>`).join('')}</tbody></table></div>` : ''}
   </div>`;
 };
+
+function experimentCard(x) {
+  const result = x.result || null;
+  const next = x.status === 'planned' ? [['active', 'Start', 'play'], ['abandoned', 'Stop', 'close']]
+    : x.status === 'active' ? [['concluded', 'Concludeer', 'check'], ['abandoned', 'Stop', 'close']]
+      : [];
+  return `<div class="card">
+    <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px"><span class="insight-ic ${x.status === 'concluded' ? 'good' : x.status === 'abandoned' ? 'risk' : 'info'}" style="width:32px;height:32px">${icon('beaker', 15)}</span>
+      <div style="min-width:0;flex:1"><div style="font-size:15.5px;font-weight:700">${esc(x.hypothesis || 'Experiment')}</div><p class="meta" style="margin:5px 0 0">${esc(x.intervention || '')}</p></div>
+      <span class="pill ${x.status === 'concluded' ? 'good' : x.status === 'abandoned' ? 'risk' : x.status === 'active' ? 'warn' : ''}">${esc(x.status)}</span></div>
+    <div class="meta mono" style="font-size:11.5px;margin-bottom:10px">${esc(x.metric_type)} · ${esc(x.baseline_start)}–${esc(x.baseline_end)} vs ${esc(x.test_start)}–${esc(x.test_end)}</div>
+    ${result ? experimentResult(result) : `<div class="meta" style="font-size:12.5px;line-height:1.45">Nog geen verdict opgeslagen.</div>`}
+    ${next.length ? `<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:12px">${next.map(([status, label, ic]) => `<button class="btn mini" data-exp-status="${esc(status)}" data-exp-id="${esc(x.id)}">${icon(ic, 13)}${label}</button>`).join('')}</div>` : ''}
+  </div>`;
+}
+
+function experimentResult(r) {
+  if (r.status === 'insufficient') {
+    return `<div style="border-top:1px solid var(--line);padding-top:10px"><span class="pill warn">insufficient</span><p class="meta" style="margin:7px 0 0;line-height:1.45">${esc(r.reason || 'Te weinig data voor een verdict.')}</p></div>`;
+  }
+  return `<div style="border-top:1px solid var(--line);padding-top:10px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="metric-val" style="font-size:20px">${r.delta > 0 ? '+' : ''}${fmtNum(r.delta, 2).replace(/,00$/, '')}</span><span class="pill ${r.direction === 'up' ? 'good' : r.direction === 'down' ? 'warn' : ''}">${esc(r.direction || 'unknown')}</span><span class="pill">${esc(r.confidence || 'low')}</span></div>
+    <p class="meta" style="margin:7px 0 0;line-height:1.45">${esc(r.verdict || '')} · baseline ${fmtNum(r.baseline?.mean, 2).replace(/,00$/, '')} (n=${esc(r.baseline?.n)}) · test ${fmtNum(r.test?.mean, 2).replace(/,00$/, '')} (n=${esc(r.test?.n)})</p>
+  </div>`;
+}
 
 const REPORTS = [['daily', 'Dagelijks', 'today'], ['weekly', 'Wekelijks', 'calendar'], ['monthly', 'Maandelijks', 'calendar'], ['quarterly', 'Kwartaal', 'doc'], ['yearly', 'Jaaroverzicht', 'shield']];
 SCREENS.reports = async () => {
@@ -1176,6 +1228,36 @@ async function trackSubmit() {
     renderScreen();
   }
 }
+async function experimentCreate() {
+  const msg = document.getElementById('exp-msg');
+  const payload = {
+    hypothesis: document.getElementById('exp-hypothesis')?.value || '',
+    intervention: document.getElementById('exp-intervention')?.value || '',
+    metric_type: document.getElementById('exp-metric')?.value || '',
+    baseline_start: document.getElementById('exp-baseline-start')?.value || '',
+    baseline_end: document.getElementById('exp-baseline-end')?.value || '',
+    test_start: document.getElementById('exp-test-start')?.value || '',
+    test_end: document.getElementById('exp-test-end')?.value || '',
+    reversible: document.getElementById('exp-reversible')?.value === '1'
+  };
+  try {
+    await postJSON('/experiments', payload);
+    invalidateExperiments();
+    renderScreen();
+  } catch (e) {
+    if (msg) msg.textContent = 'Aanmaken mislukt: ' + e.message;
+  }
+}
+async function experimentSetStatus(id, status) {
+  const msg = document.getElementById('exp-msg');
+  try {
+    await patchJSON(`/experiments/${encodeURIComponent(id)}`, { status });
+    invalidateExperiments();
+    renderScreen();
+  } catch (e) {
+    if (msg) msg.textContent = 'Status wijzigen mislukt: ' + e.message;
+  }
+}
 function invalidateAfterTrack(metric) {
   cache.delete('/observations/latest');
   cache.delete('/platform/home');
@@ -1187,10 +1269,14 @@ function invalidateAfterTrack(metric) {
   cache.delete(`/series/${metric}?bucket=day`);
   metricCache.clear();
 }
+function invalidateExperiments() {
+  cache.delete('/experiments');
+  cache.delete('/experiments/readiness');
+}
 
 // ============================================================ EVENT DELEGATION
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-nav],[data-theme-toggle],[data-open-insight],[data-insights-filter],[data-trends-range],[data-trends-metric],[data-exp-tab],[data-health-tab],[data-more],[data-close-sheet],[data-open-report],[data-print-report],[data-set-theme],[data-set-accent],[data-set-density],[data-set-font],[data-lab-parse],[data-lab-commit],[data-lab-review-id],[data-track-submit],[data-rec-action]');
+  const t = e.target.closest('[data-nav],[data-theme-toggle],[data-open-insight],[data-insights-filter],[data-trends-range],[data-trends-metric],[data-exp-tab],[data-exp-create],[data-exp-status],[data-health-tab],[data-more],[data-close-sheet],[data-open-report],[data-print-report],[data-set-theme],[data-set-accent],[data-set-density],[data-set-font],[data-lab-parse],[data-lab-commit],[data-lab-review-id],[data-track-submit],[data-rec-action]');
   if (!t) return;
   if (t.dataset.nav != null) return nav(t.dataset.nav, { metric: t.dataset.metric });
   if (t.dataset.themeToggle != null) return setTheme(state.theme === 'dark' ? 'light' : 'dark');
@@ -1199,6 +1285,8 @@ document.addEventListener('click', (e) => {
   if (t.dataset.trendsRange != null) { state.trendsRange = t.dataset.trendsRange; return renderScreen(); }
   if (t.dataset.trendsMetric != null) { state.metric = t.dataset.trendsMetric; return renderScreen(); }
   if (t.dataset.expTab != null) { state.expTab = t.dataset.expTab; return renderScreen(); }
+  if (t.dataset.expCreate != null) return experimentCreate();
+  if (t.dataset.expStatus != null) return experimentSetStatus(t.dataset.expId, t.dataset.expStatus);
   if (t.dataset.healthTab != null) { state.healthTab = t.dataset.healthTab; return renderScreen(); }
   if (t.dataset.more != null) return openSheet(moreSheet(), 'Alle secties');
   if (t.dataset.closeSheet != null) return closeSheet();
@@ -1230,7 +1318,7 @@ async function init() {
   try {
     const [ins, exp, rec] = await Promise.all([safe('/insights'), safe('/experiments/readiness'), safe('/recovery/intelligence')]);
     state.counts.insights = (ins && ins.insights || []).length;
-    state.counts.experiments = (exp && exp.experiments || []).filter((x) => x.status === 'running').length;
+    state.counts.experiments = (exp && exp.experiments || []).filter((x) => x.status === 'active').length;
     state.recoveryDot = !!(rec && rec.insufficient_recovery);
     // refresh shell badges without discarding the already-rendered screen
     const cur = document.getElementById('screen');

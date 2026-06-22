@@ -3,7 +3,7 @@
 // through the public correlations()/predictions() functions.
 import { fileURLToPath } from 'node:url';
 import { buildDb, closeDb, seedDaily, insertObs, harness } from './fixtures.mjs';
-import { correlations, predictions } from '../lib/intelligence.js';
+import { backtestForecastMetric, correlations, predictions } from '../lib/intelligence.js';
 
 const TO = '2026-03-01';
 
@@ -48,7 +48,50 @@ export function run() {
     const db = buildDb();
     seedDaily(db, 'body.weight', '2026-02-25', [80, 81, 82, 83, 84]);
     const p = predictions(db, { to: TO, days: 90, horizon: 14, metrics: 'body.weight' }).predictions[0];
-    t.eq('rising forecast', { slope: p.slope_per_day, next: p.next, conf: p.confidence }, { slope: 1, next: 98, conf: 'low' });
+    t.eq('rising forecast', {
+      slope: p.slope_per_day,
+      next: p.next,
+      conf: p.confidence,
+      fit: p.fit_quality,
+      r2: p.r2,
+      residual: p.residual_std,
+      interval: p.interval
+    }, {
+      slope: 1,
+      next: 98,
+      conf: 'high',
+      fit: 'good',
+      r2: 1,
+      residual: 0,
+      interval: { low: 98, high: 98 }
+    });
+    closeDb(db);
+  }
+
+  // ── Regression: noisy fit has residual error, R2 and interval ──────────────
+  // x=0..3, y=[1,2,2,4] → slope=0.9, intercept=0.9, SSE=0.7,
+  // residual_std=sqrt(0.7/(4-2))=0.5916, R2=1-(0.7/4.75)=0.8526.
+  {
+    const db = buildDb();
+    seedDaily(db, 'body.weight', '2026-02-26', [1, 2, 2, 4]);
+    const p = predictions(db, { to: TO, days: 90, horizon: 1, metrics: 'body.weight' }).predictions[0];
+    t.eq('noisy forecast stats', {
+      slope: p.slope_per_day,
+      next: p.next,
+      conf: p.confidence,
+      fit: p.fit_quality,
+      r2: p.r2,
+      residual: p.residual_std,
+      interval: p.interval
+    }, {
+      slope: 0.9,
+      next: 4.5,
+      conf: 'high',
+      fit: 'good',
+      r2: 0.8526,
+      residual: 0.5916,
+      interval: { low: 3.3404, high: 5.6596 }
+    });
     closeDb(db);
   }
 
@@ -57,7 +100,13 @@ export function run() {
     const db = buildDb();
     seedDaily(db, 'body.weight', '2026-02-25', [80, 80, 80]);
     const p = predictions(db, { to: TO, days: 90, horizon: 7, metrics: 'body.weight' }).predictions[0];
-    t.eq('flat forecast', { slope: p.slope_per_day, next: p.next }, { slope: 0, next: 80 });
+    t.eq('flat forecast', { slope: p.slope_per_day, next: p.next, r2: p.r2, residual: p.residual_std, interval: p.interval }, {
+      slope: 0,
+      next: 80,
+      r2: 1,
+      residual: 0,
+      interval: { low: 80, high: 80 }
+    });
     closeDb(db);
   }
 
@@ -71,12 +120,12 @@ export function run() {
     closeDb(db);
   }
 
-  // ── Regression: confidence upgrades to medium at n>=30 ──────────────────────
+  // ── Regression: confidence is derived from fit quality, not row count ──────
   {
     const db = buildDb();
-    seedDaily(db, 'body.weight', '2026-01-15', Array.from({ length: 30 }, (_, i) => 80 + i * 0.1));
+    seedDaily(db, 'body.weight', '2026-01-15', Array.from({ length: 30 }, (_, i) => i % 2 === 0 ? 80 : 90));
     const p = predictions(db, { to: TO, days: 90, horizon: 7, metrics: 'body.weight' }).predictions[0];
-    t.eq('confidence medium at n=30', { n: p.n, conf: p.confidence }, { n: 30, conf: 'medium' });
+    t.eq('poor fit remains low confidence at n=30', { n: p.n, conf: p.confidence, fit: p.fit_quality }, { n: 30, conf: 'low', fit: 'poor' });
     closeDb(db);
   }
 
@@ -87,6 +136,17 @@ export function run() {
     insertObs(db, { metric: 'body.weight', date: '2026-03-01', value: 81 });
     const p = predictions(db, { to: TO, days: 90, horizon: 7, metrics: 'body.weight' });
     t.eq('no prediction with n<3', p.predictions, []);
+    closeDb(db);
+  }
+
+  // ── Regression: backtest helper and opt-in API field ───────────────────────
+  {
+    const db = buildDb();
+    seedDaily(db, 'body.weight', '2026-02-24', [10, 12, 14, 16, 18, 20]);
+    const bt = backtestForecastMetric(db, 'body.weight', '2026-02-24', TO, { holdout: 2 });
+    t.eq('backtest helper on perfect line', bt, { count: 2, mae: 0, mean_error: 0 });
+    const p = predictions(db, { to: TO, days: 90, horizon: 1, metrics: 'body.weight', backtest: '1' }).predictions[0];
+    t.eq('prediction includes opt-in backtest', p.backtest, { count: 2, mae: 0, mean_error: 0 });
     closeDb(db);
   }
 

@@ -15,6 +15,13 @@ targets land as a NEW, additive table `user_health_goals` with CRUD at
 `health_goals` registry and its `GET /api/v1/goals` + `/progress` surfaces are
 deliberately untouched. Retire/pause is a status change; there is no DELETE.
 
+Implementation note 2026-06-20 (issue #27): Domain 8 now has the missing
+experiment lifecycle write path. `POST /api/v1/experiments` creates planned
+self-experiments against existing metric types, `PATCH /api/v1/experiments/:id`
+manages `planned|active|concluded|abandoned`, and conclusion stores a
+deterministic baseline-vs-test verdict in `experiments.result`. Analysis reads
+observations only and never fabricates or mutates observation rows.
+
 This is the central machine-readable backlog. The JSON block is the source of truth for goals 1-250.
 
 ```json
