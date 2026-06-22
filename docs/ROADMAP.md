@@ -14,6 +14,10 @@ Status values: completed, in progress, planned. This roadmap uses code/runtime e
   managed via `POST/GET/PATCH /api/v1/user-goals`. This unblocks the Daily Loop
   epic's progress/streaks child and "due goals" digest surface; the legacy
   `/goals` + `/progress` dev-registry surfaces stay as-is.
+- 2026-06-20 (issue #27): Domain 8 is no longer registry-only. Experiments can
+  be created, activated, concluded or abandoned through `/api/v1/experiments`,
+  and conclusion stores a deterministic baseline-vs-test result without writing
+  to `observations`.
 
 ## Domains
 
@@ -96,6 +100,9 @@ Goals: 76-85
 Completed: 10/10.
 
 Open product-hardening notes: Improve depth tests and data fixtures around existing behavior.
+Experiment lifecycle note: create/start/conclude/abandon is implemented via
+`POST/GET/PATCH /api/v1/experiments` plus `GET /api/v1/experiments/:id/analysis`;
+the UI can create experiments and display stored verdicts.
 
 ### Domain 9: Predictive intelligence
 

@@ -140,6 +140,27 @@ Date: 2026-06-09
   (17 suites). Governance + schema drift clean. Predeploy `node scripts/check.mjs`
   passes.
 
+## 2026-06-20 — Experiment lifecycle write path (issue #27)
+
+- Added `api/lib/experiments.js` for experiment validation, create, status
+  changes, persisted analysis, and deterministic baseline/test verdicts.
+  Metrics must exist in `metric_types`; windows are real `YYYY-MM-DD` dates;
+  statuses are `planned|active|concluded|abandoned`.
+- Added `api/routes/experiments.js`, mounted under `/api/v1`, with
+  `GET/POST /experiments`, `GET /experiments/:id`,
+  `PATCH /experiments/:id`, and `GET /experiments/:id/analysis`. Writes use
+  `writeDb()` and analysis only reads `observations`; verdicts are stored in
+  `experiments.result`.
+- Updated `api/public/app.js` so the Experimenten view can create experiments,
+  start/conclude/abandon them, and display stored sufficient or insufficient
+  verdicts. Existing readiness data remains available for candidate metrics.
+- Tests: added `api/test/experiments.test.mjs` and registered it in
+  `api/test/unit.mjs`. Verification run:
+  `NODE_MODULES_BASE=$PWD/node_modules/noop.js node test/experiments.test.mjs`
+  (18 passed) and
+  `NODE_MODULES_BASE=$PWD/node_modules/noop.js node test/unit.mjs`
+  (0 failed across 20 suites).
+
 ## Still Open
 
 - Real Apple Health export verification (external: phone export; tooling ready).

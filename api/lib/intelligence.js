@@ -1,4 +1,5 @@
 import { isDate, BadRequest, preferLatest } from './query.js';
+import { listExperiments } from './experiments.js';
 
 const CORE_METRICS = [
   'body.weight',
@@ -103,13 +104,8 @@ export function experimentReadiness(db) {
      GROUP BY mt.key
      ORDER BY n DESC, mt.key
   `).all();
-  const experiments = db.prepare(`
-    SELECT id, hypothesis, intervention, reversible, design, metric_type,
-           baseline_start, baseline_end, test_start, test_end, status, result
-      FROM experiments ORDER BY id DESC
-  `).all();
   return {
-    experiments,
+    experiments: listExperiments(db),
     candidate_metrics: metrics.map(m => ({ ...m, ready: m.n >= 14 })),
     default_design: 'single-user baseline/test window'
   };
