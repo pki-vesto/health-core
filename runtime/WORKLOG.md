@@ -98,6 +98,18 @@ Date: 2026-06-09
 - `unit.mjs` now awaits suite results so the async HTTP route suite can join the
   aggregate run. Full suite green (16/16). Governance + schema drift clean.
 
+## 2026-06-20 — Today Health OS action surface (issue #37)
+
+- Reworked the `Vandaag` tab into a Health OS daily-loop surface backed by
+  `/api/v1/today` with `/api/v1/os` fallback: digest summary, highlights, open
+  recommendations, due/off-track goals, goal progress, streaks and the
+  non-clinical disclaimer.
+- Added inline recommendation actions (`acknowledge`, `snooze`, `dismiss`,
+  `done`) posting the backend lifecycle statuses to
+  `/api/v1/recommendations/:rec_key/action`; successful actions remove the item
+  from the active list without a full page reload.
+- Added scoped Today UI styling plus Playwright coverage for digest rendering,
+  action removal, goal progress and empty states.
 ## 2026-06-18 — Domain fixture expansion (issue #3)
 
 - Expanded `api/test/seed-domains.mjs` with an explicit `DOMAIN_FIXTURE_COVERAGE`

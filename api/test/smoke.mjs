@@ -193,9 +193,9 @@ console.log(`Core API smoke tests → ${BASE}`);
   ok('daily briefing shape', body?.period === 'daily' && body?.summary);
 }
 {
-  const { status, body } = await get('/api/v1/operating-system');
-  ok('GET /api/v1/operating-system → 200', status === 200, `got ${status}`);
-  ok('operating system status', body?.status === 'operational' && body?.decision_support);
+  const { status, body } = await get('/api/v1/today');
+  ok('GET /api/v1/today → 200', status === 200, `got ${status}`);
+  ok('today operating system status', body?.status === 'operational' && body?.decision_support);
 }
 
 // Full platform routes (goals 131-240)

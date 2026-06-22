@@ -359,6 +359,15 @@ const FONT_STACKS = {
   'Onest': '"Onest", -apple-system, system-ui, sans-serif',
 };
 
+const PRIORITY_RANK = { critical: 0, high: 1, review: 1, urgent: 1, medium: 2, monitor: 2, normal: 3, low: 4 };
+const ACTIONS = {
+  acknowledge: { label: 'Erken', status: 'acknowledged', icon: 'info' },
+  snooze: { label: 'Snooze', status: 'snoozed', icon: 'clock' },
+  dismiss: { label: 'Wijs af', status: 'dismissed', icon: 'close' },
+  done: { label: 'Gedaan', status: 'done', icon: 'check' }
+};
+const TODAY_DISCLAIMER = 'Informational context derived from your own data. It does not replace medical advice or provide a diagnosis — consult a qualified clinician for medical decisions.';
+
 // ============================================================ THEME
 function applyTheme() {
   const r = document.documentElement;
@@ -375,77 +384,178 @@ function setTheme(v) { state.theme = v; localStorage.setItem('hc-theme', v); app
 const SCREENS = {};
 
 SCREENS.today = async () => {
-  const [home, rec, insRaw, risks, exp, m] = await Promise.all([
-    safe('/platform/home'), safe('/recovery/intelligence'), safe('/insights'), safe('/risks'),
-    safe('/experiments/readiness'), getMetrics(['hrv', 'rhr', 'deep', 'readiness', 'sleep']),
-  ]);
-  const fatigue = rec && typeof rec.fatigue === 'number' ? rec.fatigue : null;
-  let R = rec && typeof rec.capacity === 'number' ? rec.capacity : (m.readiness.current ?? 70);
-  R = Math.round(Math.max(0, Math.min(100, R)));
-  const word = R >= 75 ? 'goed' : R >= 60 ? 'matig' : 'laag';
-  const constrained = rec && rec.insufficient_recovery;
-  const insights = (insRaw && insRaw.insights || []).map(mapInsight);
-  state.insights = insights;
-  const topInsights = insights.slice(0, 2);
-  const topRisks = (risks && risks.early_warnings || []).slice(0, 2);
-  const running = (exp && exp.experiments || []).filter((x) => x.status === 'active');
-  const ready = (exp && exp.candidate_metrics || []).filter((x) => x.ready);
-  const contrib = [
-    { label: 'HRV', m: m.hrv, fmt: (x) => fmtNum(x.current, 0) + ' ms' },
-    { label: 'Diepe slaap', m: m.deep, fmt: (x) => hm(x.current) },
-    { label: 'Rusthartslag', m: m.rhr, fmt: (x) => fmtNum(x.current, 0) + ' bpm' },
-    { label: 'Slaapduur', m: m.sleep, fmt: (x) => hm(x.current) },
-  ].filter((c) => c.m && !c.m.empty);
+  const todayRaw = await safe('/today') || await safe('/os') || {};
+  const today = normalizeToday(todayRaw || {});
+  const summary = today.summaryLine || 'Nog geen dagelijkse digest beschikbaar. Zodra er genoeg recente data is, verschijnt hier de briefing.';
+  const generated = today.generatedAt ? today.generatedAt.slice(0, 16).replace('T', ' ') : fmtToday();
 
-  return `<div class="page stagger">
-    <div class="card raised today-hero anim" style="margin-bottom:22px;padding:26px">
-      <div style="display:flex;gap:26px;align-items:center;flex-wrap:wrap">
-        ${readinessGauge(R, 150)}
+  return `<div class="page wide stagger today-os" data-testid="today-view">
+    <div class="card raised today-hero anim today-briefing" style="margin-bottom:22px;padding:26px">
+      <div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap">
+        <span class="brand-mark" style="width:44px;height:44px;border-radius:13px">${icon('today', 22)}</span>
         <div style="flex:1;min-width:240px">
-          <div class="eyebrow" style="margin-bottom:7px">${greeting()} · ${fmtToday()}</div>
-          <p class="briefing" style="margin:0">Je readiness is <strong>${R}</strong> — <span class="hl">${word}</span>.
-          ${constrained ? 'Je herstel staat onder lichte druk' : 'Je herstel is grotendeels op peil'}${fatigue != null ? `, met een vermoeidheidsscore van <span class="hl">${Math.round(fatigue)}/100</span>` : ''}.
-          ${constrained ? 'De signalen wijzen op opgebouwde belasting — geef je lichaam wat ruimte.' : 'Houd je ritme vast en blijf je signalen volgen.'}</p>
-          <div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap">
-            <button class="btn primary" data-nav="insights">${icon('insights', 15)}Lees je briefing</button>
-            <button class="btn" data-nav="recovery">${icon('recovery', 15)}Herstel</button>
-          </div>
+          <div class="eyebrow" style="margin-bottom:7px">Health OS · ${esc(generated)}</div>
+          <p class="briefing" style="margin:0">${esc(summary)}</p>
         </div>
+        <span class="pill ${today.recommendations.length ? 'warn' : 'good'}">${today.recommendations.length} open actie(s)</span>
       </div>
-      ${contrib.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:22px;border-top:1px solid var(--line);padding-top:4px">
-        ${contrib.map((c, i) => { const s = c.m.status === 'good' || c.m.status === 'flat' || c.m.status === 'idle' ? 'good' : c.m.status; return `<div style="padding:13px 14px 4px;${i === 0 ? '' : 'border-left:1px solid var(--line)'}">
-          <div style="display:flex;align-items:center;gap:7px">${sdot(s)}<span style="font-size:11.5px;color:var(--ink-3);font-weight:600;white-space:nowrap">${esc(c.label)}</span></div>
-          <div class="metric-val" style="font-size:17px;margin-top:6px">${c.fmt(c.m)}</div>
-          <div style="font-size:11px;color:var(--ink-faint);margin-top:3px;line-height:1.3">${c.m.dir === 'flat' ? 'stabiel' : `${c.m.pct > 0 ? '+' : ''}${c.m.pct}% vs baseline`}</div></div>`; }).join('')}
-      </div>` : ''}
+      ${today.highlights.length ? `<div class="today-highlight-grid">${today.highlights.slice(0, 6).map(todayHighlight).join('')}</div>` : `<div class="empty today-empty">Geen highlights in de digest</div>`}
     </div>
 
-    ${sectionTitle('Belangrijkste veranderingen', `<button class="btn ghost sm" data-nav="trends">Alle trends ${icon('chevR', 13)}</button>`)}
-    <div class="cols-4" style="margin-bottom:24px">${['hrv', 'rhr', 'deep', 'readiness'].map((k) => metricTile(m[k])).join('')}</div>
+    <div class="today-disclaimer" data-testid="today-disclaimer">${icon('info', 15)}<span>${esc(today.disclaimer || TODAY_DISCLAIMER)}</span></div>
 
-    <div class="split">
-      <div>
-        ${sectionTitle('Inzichten voor vandaag', `<button class="btn ghost sm" data-nav="insights">Alle inzichten ${icon('chevR', 13)}</button>`)}
-        <div class="grid" style="gap:14px">${topInsights.length ? topInsights.map((i) => insightCard(i, { compact: true })).join('') : `<div class="empty">Nog geen inzichten</div>`}</div>
+    <div class="split today-layout">
+      <div class="grid" style="gap:18px;align-content:start">
+        <section>
+          ${sectionTitle('Open aanbevelingen', `<span id="today-rec-count" class="pill ${today.recommendations.length ? 'warn' : 'good'}">${today.recommendations.length}</span>`)}
+          <div id="today-rec-list" class="grid" style="gap:12px" data-testid="today-recommendations">
+            ${today.recommendations.length ? today.recommendations.map(todayRecommendation).join('') : todayEmpty('check', 'Geen open aanbevelingen', 'Alles wat afgehandeld, gesnoozed of dismissed is blijft uit deze actieve lijst.')}
+          </div>
+        </section>
+
+        <section>
+          ${sectionTitle('Doelen due/off-track')}
+          <div class="grid" style="gap:12px" data-testid="today-goals-due">
+            ${today.goalAlerts.length ? today.goalAlerts.map(todayGoalAlert).join('') : todayEmpty('target', 'Geen doelen off-track', 'Er zijn vandaag geen urgente of achterstallige doel-signalen.')}
+          </div>
+        </section>
       </div>
-      <div class="grid" style="gap:16px;align-content:start">
-        <div class="card">
-          <div class="card-head" style="margin-bottom:12px"><div><div class="ttl">Aandachtspunten</div></div><span class="right pill ${topRisks.length ? 'risk' : ''}">${(risks && risks.indicators || []).length}</span></div>
-          ${topRisks.length ? topRisks.map((rk) => { const lvl = rk.severity === 'high' ? 'risk' : 'warn'; return `<button class="row" data-nav="recovery" style="width:100%;border:none;background:none;cursor:pointer;text-align:left;font-family:inherit"><span class="lead"><span class="insight-ic ${lvl}">${icon(lvl === 'risk' ? 'alert' : 'info', 14)}</span><span style="min-width:0"><span class="nm" style="display:block">${esc(humanMetric(rk.metric) || cap(rk.type || 'signaal'))}</span><span class="meta">${esc((rk.type || '').replace(/_/g, ' '))}</span></span></span><span class="pill" style="margin-left:auto">${esc(rk.severity || '')}</span></button>`; }).join('') : `<div class="empty" style="padding:18px">Geen acute aandachtspunten</div>`}
-        </div>
-        <div class="card">
-          <div class="card-head" style="margin-bottom:12px"><div><div class="ttl">Experimenten</div></div><button class="btn ghost sm right" data-nav="experiments">Alle ${icon('chevR', 13)}</button></div>
-          ${running.length ? running.map((x) => `<div style="margin-bottom:6px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="sdot good" style="animation:pulse 2s infinite"></span><span style="font-size:13px;font-weight:650">${esc(x.hypothesis || x.intervention || 'Experiment')}</span></div></div>`).join('')
-            : `<div class="meta" style="font-size:12.5px;line-height:1.5">Geen lopende experimenten.${ready.length ? ` <b>${ready.length}</b> metric(s) hebben genoeg data om te testen.` : ''}</div>`}
-        </div>
-        <div class="card" style="display:flex;align-items:center;gap:12px">
-          <span class="insight-ic good">${icon('flame', 15)}</span>
-          <div style="min-width:0"><div style="font-size:13.5px;font-weight:650">${home && home.profile && home.profile.latest ? home.profile.latest.length : (m.hrv.series.length || 0)} actieve signalen</div><div class="meta" style="font-size:11.5px">Lokaal verwerkt · privacy-first</div></div>
-        </div>
+
+      <div class="grid" style="gap:18px;align-content:start">
+        <section>
+          ${sectionTitle('Goal progress & streaks')}
+          <div class="grid" style="gap:12px" data-testid="today-goal-progress">
+            ${today.goalProgress.length ? today.goalProgress.map(todayGoalProgress).join('') : todayEmpty('flame', 'Nog geen goal progress', 'Zodra de progress API current/target of streaks levert, zie je hier voortgang per persoonlijk doel.')}
+          </div>
+        </section>
+
+        <section>
+          ${sectionTitle('Streaks')}
+          <div class="card">
+            ${today.streaks.length ? today.streaks.map(todayStreak).join('') : `<div class="empty" style="padding:18px">Geen actieve streaks</div>`}
+          </div>
+        </section>
       </div>
     </div>
   </div>`;
 };
+
+function normalizeToday(os, goalsRaw = {}) {
+  const digest = os.today || os.digest || os.briefing || os;
+  const decision = os.decision_support || os.decisionSupport || {};
+  const progress = os.progress || digest.progress || {};
+  const goals = goalsRaw.goals || os.goals || digest.goals || [];
+  const recommendations = firstArray(digest.recommendations, digest.decisions, decision.recommendations, os.recommendations)
+    .map(normalizeRecommendation).filter((r) => r.key || r.message).sort(prioritySort);
+  const highlights = firstArray(digest.highlights, digest.alerts, os.highlights).map(normalizeHighlight).sort(prioritySort);
+  const explicitGoalProgress = firstArray(digest.goal_progress, digest.goalProgress, progress.goal_progress, progress.goals_progress, progress.items, os.goal_progress);
+  const goalProgress = explicitGoalProgress.length ? explicitGoalProgress.map(normalizeGoalProgress)
+    : fallbackGoalProgress(progress.goals, goals);
+  const goalAlerts = firstArray(digest.goals_due, digest.goalsDue, digest.goals_off_track, digest.goalsOffTrack, os.goals_due)
+    .map(normalizeGoalAlert);
+  const streaks = firstArray(digest.streaks, progress.streaks, os.streaks).map(normalizeStreak);
+  return {
+    generatedAt: digest.generated_at || digest.generatedAt || os.generated_at,
+    summaryLine: todaySummaryLine(digest.summary || digest.briefing || digest),
+    highlights,
+    recommendations,
+    goalAlerts,
+    goalProgress,
+    streaks,
+    disclaimer: digest.disclaimer || decision.note || os.disclaimer
+  };
+}
+function firstArray(...xs) { return xs.find((x) => Array.isArray(x) && x.length) || []; }
+function prioritySort(a, b) { return (priorityRank(a.priority) - priorityRank(b.priority)) || ((a.index || 0) - (b.index || 0)); }
+function priorityRank(p) { return PRIORITY_RANK[String(p || '').toLowerCase()] ?? 3; }
+function todaySummaryLine(summary) {
+  if (summary == null) return '';
+  if (typeof summary === 'string') return summary;
+  if (summary.text || summary.message || summary.title) return summary.text || summary.message || summary.title;
+  const parts = [];
+  for (const [k, v] of Object.entries(summary)) {
+    if (v == null || typeof v === 'object') continue;
+    parts.push(`${k.replace(/_/g, ' ')}: ${v}`);
+  }
+  return parts.join(' · ');
+}
+function normalizeHighlight(x, i) {
+  if (typeof x === 'string') return { title: x, detail: '', priority: 'normal', index: i };
+  return { title: x.title || x.label || humanMetric(x.metric) || x.type || 'Highlight', detail: x.detail || x.summary || x.message || '', priority: x.priority || x.severity || 'normal', index: i };
+}
+function normalizeRecommendation(x, i) {
+  if (typeof x === 'string') return { key: `ui:${i}`, title: 'Aanbeveling', message: x, priority: 'normal', type: 'general', index: i };
+  const key = x.rec_key || x.key || x.id || x.recommendation_id || '';
+  return { key, title: x.title || cap(x.type || x.category || 'Aanbeveling'), message: x.message || x.summary || x.detail || x.text || '', priority: x.priority || x.severity || 'normal', type: x.type || x.category || 'general', index: i };
+}
+function normalizeGoalAlert(x, i) {
+  if (typeof x === 'string') return { title: x, detail: '', status: 'due', index: i };
+  return { title: x.title || x.name || `Doel ${i + 1}`, detail: x.detail || x.summary || x.reason || '', status: x.status || x.state || 'due', index: i };
+}
+function normalizeGoalProgress(x, i) {
+  const current = numberOrNull(x.current ?? x.value ?? x.completed ?? x.done);
+  const target = numberOrNull(x.target ?? x.goal ?? x.total);
+  const pct = numberOrNull(x.percent ?? x.percentage ?? x.progress_pct);
+  const percent = pct != null ? pct : (target && current != null ? (current / target) * 100 : null);
+  return { title: x.title || x.name || x.goal || `Doel ${i + 1}`, current, target, unit: x.unit || '', percent, streak: x.streak ?? x.current_streak ?? null, streakUnit: x.streak_unit || 'dagen', status: x.status || '' };
+}
+function normalizeStreak(x, i) {
+  if (typeof x === 'string') return { title: x, value: null, unit: '' };
+  return { title: x.title || x.name || `Streak ${i + 1}`, value: x.value ?? x.days ?? x.streak ?? x.current_streak ?? null, unit: x.unit || x.streak_unit || 'dagen' };
+}
+function fallbackGoalProgress(counts, goals) {
+  if (!counts && !goals.length) return [];
+  const completed = Number(counts?.complete ?? counts?.completed ?? goals.filter((g) => g.status === 'complete').length);
+  const total = Number(counts?.total ?? goals.length);
+  if (!Number.isFinite(total) || total <= 0) return [];
+  return [{ title: 'Health OS registry', current: completed, target: total, unit: 'doelen', percent: (completed / total) * 100, streak: completed === total ? total : null, streakUnit: 'complete' }];
+}
+function numberOrNull(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
+function percentLabel(v) { return v == null ? '—' : `${Math.round(Math.max(0, Math.min(100, v)))}%`; }
+function todayPriorityClass(p) {
+  const r = priorityRank(p);
+  return r <= 1 ? 'risk' : r === 2 ? 'warn' : 'info';
+}
+function todayHighlight(h) {
+  const cls = todayPriorityClass(h.priority);
+  return `<div class="today-highlight"><span class="insight-ic ${cls}">${icon(cls === 'risk' ? 'alert' : 'spark', 14)}</span><div><div class="ttl">${esc(h.title)}</div>${h.detail ? `<div class="meta">${esc(h.detail)}</div>` : ''}</div></div>`;
+}
+function todayRecommendation(r) {
+  const cls = todayPriorityClass(r.priority);
+  const key = encodeURIComponent(r.key || `ui:${r.index}`);
+  return `<article class="card today-rec" data-rec-key="${esc(r.key || '')}">
+    <div style="display:flex;gap:12px;align-items:flex-start">
+      <span class="insight-ic ${cls}">${icon(cls === 'risk' ? 'alert' : 'info', 14)}</span>
+      <div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h3>${esc(r.title)}</h3><span class="pill ${cls}">${esc(r.priority || 'normal')}</span></div>
+        <p>${esc(r.message || 'Geen detailtekst beschikbaar.')}</p>
+        <div class="today-rec-actions">
+          ${Object.entries(ACTIONS).map(([action, cfg]) => `<button class="btn sm ${action === 'done' ? 'primary' : ''}" data-rec-action="${action}" data-rec-key="${esc(key)}">${icon(cfg.icon, 13)}${cfg.label}</button>`).join('')}
+        </div>
+        <div class="meta today-rec-msg" aria-live="polite"></div>
+      </div>
+    </div>
+  </article>`;
+}
+function todayGoalAlert(g) {
+  const cls = /off|risk|blocked|late/i.test(g.status) ? 'warn' : 'info';
+  return `<div class="card today-goal-alert"><div style="display:flex;gap:10px;align-items:flex-start"><span class="insight-ic ${cls}">${icon('target', 14)}</span><div><div style="font-size:13.5px;font-weight:700">${esc(g.title)}</div>${g.detail ? `<div class="meta" style="margin-top:4px">${esc(g.detail)}</div>` : ''}<span class="pill ${cls}" style="margin-top:9px">${esc(g.status)}</span></div></div></div>`;
+}
+function todayGoalProgress(g) {
+  const pct = Math.max(0, Math.min(100, g.percent ?? 0));
+  const current = g.current == null ? '—' : fmtNum(g.current, Number.isInteger(g.current) ? 0 : 1);
+  const target = g.target == null ? '—' : fmtNum(g.target, Number.isInteger(g.target) ? 0 : 1);
+  return `<div class="card today-goal-progress-card">
+    <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px"><span class="insight-ic good">${icon('target', 14)}</span><div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:700">${esc(g.title)}</div><div class="meta">${current} / ${target} ${esc(g.unit || '')}</div></div><span class="metric-val" style="font-size:20px">${percentLabel(g.percent)}</span></div>
+    <div class="track"><i style="width:${pct}%;background:var(--accent)"></i></div>
+    ${g.streak != null ? `<div class="today-streak-line">${icon('flame', 13)}<span>${esc(g.streak)} ${esc(g.streakUnit)}</span></div>` : ''}
+  </div>`;
+}
+function todayStreak(s) {
+  return `<div class="row"><span class="lead"><span class="insight-ic good">${icon('flame', 14)}</span><span><span class="nm" style="display:block">${esc(s.title)}</span><span class="meta">${s.value == null ? 'Actief' : `${esc(s.value)} ${esc(s.unit)}`}</span></span></span></div>`;
+}
+function todayEmpty(ic, title, detail) {
+  return `<div class="empty today-empty">${icon(ic, 18)}<div style="font-weight:700;color:var(--ink);margin-top:8px">${esc(title)}</div><div style="font-size:12.5px;line-height:1.45;margin-top:4px">${esc(detail)}</div></div>`;
+}
 
 SCREENS.track = async () => {
   const [catalog, latest] = await Promise.all([safe('/metrics'), safe('/observations/latest')]);
@@ -1028,6 +1138,36 @@ async function labReviewAction(id, status) {
   }
 }
 
+async function todayRecommendationAction(button) {
+  const action = button.dataset.recAction;
+  const cfg = ACTIONS[action];
+  const recKey = button.dataset.recKey;
+  const card = button.closest('.today-rec');
+  const msg = card?.querySelector('.today-rec-msg');
+  if (!cfg || !recKey) return;
+  const payload = { status: cfg.status };
+  if (action === 'snooze') payload.snooze_until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  button.disabled = true;
+  if (msg) msg.textContent = 'Actie opslaan...';
+  try {
+    await postJSON(`/recommendations/${recKey}/action`, payload);
+    cache.delete('/today');
+    cache.delete('/os');
+    if (card) card.remove();
+    const list = document.getElementById('today-rec-list');
+    const count = document.getElementById('today-rec-count');
+    const remaining = list ? list.querySelectorAll('.today-rec').length : 0;
+    if (count) {
+      count.textContent = String(remaining);
+      count.className = `pill ${remaining ? 'warn' : 'good'}`;
+    }
+    if (list && remaining === 0) list.innerHTML = todayEmpty('check', 'Geen open aanbevelingen', 'Alles wat afgehandeld, gesnoozed of dismissed is blijft uit deze actieve lijst.');
+  } catch (e) {
+    button.disabled = false;
+    if (msg) msg.textContent = 'Actie mislukt: ' + e.message;
+  }
+}
+
 async function trackMetricChanged() {
   const sel = document.getElementById('track-metric');
   const unit = document.getElementById('track-unit');
@@ -1136,7 +1276,7 @@ function invalidateExperiments() {
 
 // ============================================================ EVENT DELEGATION
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-nav],[data-theme-toggle],[data-open-insight],[data-insights-filter],[data-trends-range],[data-trends-metric],[data-exp-tab],[data-exp-create],[data-exp-status],[data-health-tab],[data-more],[data-close-sheet],[data-open-report],[data-print-report],[data-set-theme],[data-set-accent],[data-set-density],[data-set-font],[data-lab-parse],[data-lab-commit],[data-lab-review-id],[data-track-submit]');
+  const t = e.target.closest('[data-nav],[data-theme-toggle],[data-open-insight],[data-insights-filter],[data-trends-range],[data-trends-metric],[data-exp-tab],[data-exp-create],[data-exp-status],[data-health-tab],[data-more],[data-close-sheet],[data-open-report],[data-print-report],[data-set-theme],[data-set-accent],[data-set-density],[data-set-font],[data-lab-parse],[data-lab-commit],[data-lab-review-id],[data-track-submit],[data-rec-action]');
   if (!t) return;
   if (t.dataset.nav != null) return nav(t.dataset.nav, { metric: t.dataset.metric });
   if (t.dataset.themeToggle != null) return setTheme(state.theme === 'dark' ? 'light' : 'dark');
@@ -1160,6 +1300,7 @@ document.addEventListener('click', (e) => {
   if (t.dataset.labCommit != null) return labCommit();
   if (t.dataset.labReviewId != null) return labReviewAction(t.dataset.labReviewId, t.dataset.labReviewStatus);
   if (t.dataset.trackSubmit != null) return trackSubmit();
+  if (t.dataset.recAction != null) return todayRecommendationAction(t);
 });
 document.addEventListener('focusin', (e) => { if (e.target && e.target.id === 'lab-biomarker') labLoadBiomarkers(); });
 document.addEventListener('change', (e) => { if (e.target && e.target.id === 'track-metric') trackMetricChanged(); });
