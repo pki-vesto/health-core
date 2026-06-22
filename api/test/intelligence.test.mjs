@@ -135,7 +135,17 @@ export function run() {
     seedDaily(db, 'body.weight', '2026-02-25', [80, 81, 82, 83, 84]);
     const p = predictions(db, { to: TO, days: 90, horizon: 14 });
     t.eq('one prediction (only metric with n>=3)', p.predictions.length, 1);
-    t.eq('linear forecast', p.predictions[0], { metric: 'body.weight', n: 5, slope_per_day: 1, next: 98, confidence: 'low' });
+    t.eq('linear forecast', p.predictions[0], {
+      metric: 'body.weight',
+      n: 5,
+      slope_per_day: 1,
+      next: 98,
+      confidence: 'high',
+      fit_quality: 'good',
+      r2: 1,
+      residual_std: 0,
+      interval: { low: 98, high: 98 }
+    });
     closeDb(db);
   }
 

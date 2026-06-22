@@ -40,6 +40,14 @@ Date: 2026-06-09
   computing RHR locally for fatigue scoring; high recovery warnings and
   overtraining are now reachable in `api/test/platform.test.mjs`.
 
+## 2026-06-20 — Forecast uncertainty and backtest hardening
+
+- Extended `GET /api/v1/predictions` forecast math with R2, residual standard
+  error, fit quality, fit-derived confidence and a documented approximate 95%
+  residual-error interval (`next +/- 1.96 * residual_std`).
+- Added an opt-in `backtest=1` hold-out tail accuracy field plus deterministic
+  math tests for perfect, noisy, constant, sparse and backtested series.
+
 ## 2026-06-09 — UI redesign ("Personal Health OS", Claude Design handoff)
 
 - Implemented the Claude Design handoff (`Health Core.html` + bundle) as a full

@@ -112,7 +112,10 @@ Goals: 86-95
 
 Completed: 10/10.
 
-Open product-hardening notes: Improve depth tests and data fixtures around existing behavior.
+Open product-hardening notes: Forecast math now reports residual-standard-error
+intervals, R2, fit quality and opt-in hold-out backtests with deterministic unit
+coverage; continue expanding user-facing acceptance fixtures around prediction
+workflows.
 
 ### Domain 10: Product maturity
 
@@ -279,5 +282,8 @@ Open product-hardening notes: Validate intelligence quality with richer fixtures
 1. Verify Apple Health with a real export.
 2. Add dedicated lab import and lab-result review workflow.
 3. Expand fixture data to cover all registered metric domains. **Done 2026-06-18:** `api/test/seed-domains.mjs` now exports an explicit 1-25 fixture coverage manifest, seeds every active metric plus representative capability tables, and `domain-fixtures.test.mjs` verifies coverage, edge cases and determinism.
-4. Harden intelligence math with deterministic unit tests.
+4. Harden intelligence math with deterministic unit tests. **Done 2026-06-20:**
+   `GET /api/v1/predictions` forecasts now include R2, residual standard error,
+   a documented `next +/- 1.96 * residual_std` interval, fit-derived confidence
+   and opt-in hold-out backtest metrics covered by `api/test/math.test.mjs`.
 5. Complete report UI coverage for quarterly and yearly briefings.
